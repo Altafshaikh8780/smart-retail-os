@@ -1,73 +1,231 @@
-# React + TypeScript + Vite
+# 🧠 Smart Retail OS – Offline-First Retail Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Smart Retail OS is a modern, offline-first retail management application designed to handle inventory, billing, customers, analytics, and employee workflows — all in one system.
 
-Currently, two official plugins are available:
+Built using **React + TypeScript + Vite**, this system is optimized for performance, scalability, and real-world retail usage.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🚀 Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 🏪 Inventory Management
 
-## Expanding the ESLint configuration
+* Add, edit, delete products
+* Product categories
+* Stock tracking
+* Product image management (Cloudinary support)
+* Second-hand product module
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 💸 Billing & Checkout
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+* Create invoices
+* Add products to cart
+* Automatic calculations (subtotal, tax, grand total)
+* Customer-linked billing
+* PDF invoice generation
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 👤 Customer Management
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+* Add and manage customers
+* Track purchase history
+
+### 📊 Analytics Dashboard
+
+* Sales overview
+* Revenue tracking
+* Product performance insights
+
+### 👨‍💼 Employee Management
+
+* Admin & Employee roles
+* Role-based permissions
+* Secure authentication
+
+### 🔄 Offline-First System
+
+* Works without internet
+* Sync queue for pending actions
+* Auto-sync when back online
+
+### 📁 Reports & Export
+
+* CSV export
+* Clean invoice formatting
+* Structured file naming
+
+---
+
+## 🧱 Tech Stack
+
+* **Frontend:** React + TypeScript + Vite
+* **State Management:** Custom hooks / stores
+* **Styling:** Tailwind CSS
+* **Database (Local):** IndexedDB / Local Storage
+* **Cloud Integration:** Firebase (optional)
+* **File Storage:** Cloudinary
+* **Deployment:** Vercel
+
+---
+
+## 📂 Project Structure
+
+```
+Smart_retail_os/
+│
+├── public/                # Static assets
+├── src/
+│   ├── components/        # UI components
+│   ├── pages/             # App pages (Dashboard, Inventory, etc.)
+│   ├── layouts/           # Layouts (Admin panel, etc.)
+│   ├── hooks/             # Custom hooks
+│   ├── lib/               # Core logic (auth, firebase, pdf, etc.)
+│   ├── store/             # State management
+│   ├── scripts/           # Seed/reset scripts
+│   └── assets/            # Images and icons
+│
+├── .env                   # Environment variables (NOT committed)
+├── package.json
+└── vite.config.ts
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## ⚙️ Installation & Setup
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1️⃣ Clone the repository
+
 ```
+git clone https://github.com/Altafshaikh8780/smart-retail-os.git
+cd smart-retail-os
+```
+
+---
+
+### 2️⃣ Install dependencies
+
+```
+npm install
+```
+
+---
+
+### 3️⃣ Setup environment variables
+
+Create a `.env` file in root:
+
+```
+VITE_FIREBASE_API_KEY=your_key
+VITE_FIREBASE_AUTH_DOMAIN=your_domain
+VITE_API_URL=your_api_url
+```
+
+⚠️ Do NOT commit `.env` file
+
+---
+
+### 4️⃣ Run the project
+
+```
+npm run dev
+```
+
+App will run on:
+
+```
+http://localhost:5173
+```
+
+---
+
+### 5️⃣ Build for production
+
+```
+npm run build
+```
+
+---
+
+### 6️⃣ Preview production build
+
+```
+npm run preview
+```
+
+---
+
+## ☁️ Deployment (Vercel)
+
+1. Push code to GitHub:
+
+```
+git push origin main
+```
+
+2. Go to Vercel
+
+3. Import repository
+
+4. Configure:
+
+   * Build Command: `npm run build`
+   * Output Directory: `dist`
+
+5. Add environment variables in Vercel dashboard
+
+6. Deploy 🚀
+
+---
+
+## 🔐 Authentication Notes
+
+* Uses role-based authentication
+* Admin has full access
+* Employees have restricted permissions
+
+---
+
+## 🔄 Offline Sync Logic
+
+* All actions stored locally first
+* Sync queue manages pending operations
+* Auto-sync triggers when internet is restored
+
+---
+
+## ⚠️ Important Notes
+
+* SQLite is NOT used on Vercel backend
+* Use Firebase or cloud APIs for production sync
+* Images should be stored using Cloudinary or similar service
+
+---
+
+## 🧪 Testing Checklist
+
+* Add/Edit/Delete product
+* Generate invoice
+* Export CSV
+* Offline → Online sync
+* Role-based access control
+
+---
+
+## 🔮 Future Enhancements
+
+* Barcode scanning
+* Multi-store support
+* AI-based inventory prediction
+* Mobile app version
+
+---
+
+## 👨‍💻 Author
+
+**Altaf Shaikh**
+GitHub: https://github.com/Altafshaikh8780
+
+---
+
+## 📜 License
+
+This project is for educational and academic purposes.
