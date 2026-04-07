@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { getFirestore, doc, setDoc, addDoc, serverTimestamp, collection, query, getDocs, deleteDoc, writeBatch } from "firebase/firestore";
+import { getFirestore, doc, setDoc, addDoc, serverTimestamp, collection, getDocs, writeBatch } from "firebase/firestore";
 import "dotenv/config";
 
 const firebaseConfig = {

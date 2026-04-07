@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { motion } from "framer-motion";
-import { ArrowLeft, Mail, Shield, ShieldAlert, Key, Zap, Save, Loader2, User } from "lucide-react";
+import { ArrowLeft, Mail, Shield, ShieldAlert, Key, Zap, Loader2, User } from "lucide-react";
 import toast from "react-hot-toast";
 import CryptoJS from "crypto-js";
 import { useAuth } from "../lib/auth";
