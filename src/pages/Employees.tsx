@@ -6,7 +6,8 @@ import { db } from "../lib/firebase";
 import { useAuth } from "../lib/auth";
 import { AddEmployeeModal } from "../components/AddEmployeeModal";
 import { useNavigate } from "react-router-dom";
-
+import { useSettingsStore } from "../store/settingsStore";
+import { formatCurrency } from "../lib/validations";
 type EmployeeRole = "Admin" | "Sales" | "Support";
 type EmployeeStatus = "Active" | "On Leave" | "Inactive";
 
@@ -29,7 +30,9 @@ type EmployeeRecord = {
 export const Employees: React.FC = () => {
   const { role } = useAuth();
   const navigate = useNavigate();
+  const { settings } = useSettingsStore();
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
+  const [employeeStats, setEmployeeStats] = useState<Record<string, { orders: number, revenue: number }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,6 +48,19 @@ export const Employees: React.FC = () => {
         data.push({ id: doc.id, ...doc.data() } as EmployeeRecord);
       });
       setEmployees(data);
+      
+      const ordersSnap = await getDocs(collection(db, "orders"));
+      const stats: Record<string, { orders: number, revenue: number }> = {};
+      ordersSnap.forEach(doc => {
+        const o = doc.data();
+        const cid = o.cashierId;
+        if (cid) {
+          if (!stats[cid]) stats[cid] = { orders: 0, revenue: 0 };
+          stats[cid].orders += 1;
+          stats[cid].revenue += (o.total || 0);
+        }
+      });
+      setEmployeeStats(stats);
     } catch (err: any) {
       console.error("Error fetching employees:", err);
       setError(err.message || "Failed to load employee data.");
@@ -203,6 +219,17 @@ export const Employees: React.FC = () => {
                       </div>
                     </div>
                   )}
+
+                  <div className="space-y-2 mt-2 pt-3 border-t border-gray-100">
+                     <div className="flex items-center justify-between text-xs">
+                       <span className="text-gray-500 font-medium">Orders Handled</span>
+                       <span className="font-bold text-gray-900">{employeeStats[employee.authUid || '']?.orders || 0}</span>
+                     </div>
+                     <div className="flex items-center justify-between text-xs">
+                       <span className="text-gray-500 font-medium">Revenue Generated</span>
+                       <span className="font-bold text-green-600">{formatCurrency(employeeStats[employee.authUid || '']?.revenue || 0, settings.currency || '$')}</span>
+                     </div>
+                  </div>
                 </div>
               </motion.div>
             ))}

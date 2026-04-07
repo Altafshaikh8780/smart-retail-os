@@ -256,21 +256,13 @@ export const Products: React.FC = () => {
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
-                className={`whitespace-nowrap px-6 py-2.5 rounded-2xl text-sm font-bold transition-all duration-300 relative border-2 ${
+                className={`whitespace-nowrap px-6 py-2.5 rounded-2xl text-sm font-bold transition-all duration-300 border shadow-sm ${
                   activeCategory === category 
-                    ? "text-white border-primary shadow-lg shadow-primary/20" 
-                    : "text-gray-500 border-transparent bg-gray-50 hover:bg-gray-100 hover:text-gray-700"
+                    ? "bg-primary text-white border-primary" 
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                 }`}
               >
-                {activeCategory === category && (
-                  <motion.div
-                    layoutId="active-category"
-                    className="absolute inset-0 bg-primary rounded-[14px] -z-10"
-                    initial={false}
-                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                  />
-                )}
-                <span className="relative z-10 uppercase tracking-widest text-[11px]">{category}</span>
+                <span className="uppercase tracking-widest text-[11px]">{category}</span>
               </button>
             ))}
           </div>

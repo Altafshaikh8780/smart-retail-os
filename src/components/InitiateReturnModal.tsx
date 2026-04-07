@@ -9,9 +9,10 @@ import { processReturnTransaction } from "../lib/returnService";
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  prefillOrderNumber?: string;
 }
 
-export const InitiateReturnModal: React.FC<Props> = ({ isOpen, onClose }) => {
+export const InitiateReturnModal: React.FC<Props> = ({ isOpen, onClose, prefillOrderNumber }) => {
   const [orderQuery, setOrderQuery] = useState("");
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [orderData, setOrderData] = useState<any>(null);
@@ -20,6 +21,21 @@ export const InitiateReturnModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [refundMethod, setRefundMethod] = useState<"UPI" | "Card" | "Cash">("Card");
   const [refundAmount, setRefundAmount] = useState<number>(0);
   const [processing, setProcessing] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen && prefillOrderNumber && !orderData) {
+      setOrderQuery(prefillOrderNumber);
+      // We need to call handleSearchOrder but it's a function inside.
+      // Re-factoring handleSearchOrder to be callable or just trigger it.
+    }
+  }, [isOpen, prefillOrderNumber]);
+
+  // Trigger search if prefill is provided
+  React.useEffect(() => {
+    if (isOpen && prefillOrderNumber && orderQuery === prefillOrderNumber && !orderData && !loadingOrder) {
+       handleSearchOrder();
+    }
+  }, [orderQuery]);
 
   const handleSearchOrder = async () => {
     if (!orderQuery.trim()) {

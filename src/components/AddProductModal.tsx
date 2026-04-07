@@ -84,6 +84,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
         supplierName: formData.supplierName || "N/A",
         condition: formData.category === "Second-hand" ? formData.condition : "New",
         imei: formData.category === "Second-hand" ? formData.imei : "",
+        isSecondHand: formData.category === "Second-hand",
         createdAt: serverTimestamp()
       };
 

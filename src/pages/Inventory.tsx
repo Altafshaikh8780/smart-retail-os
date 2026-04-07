@@ -45,9 +45,8 @@ export const Inventory: React.FC = () => {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const [productsSnap, inventorySnap] = await Promise.all([
-        getDocs(collection(db, "products")),
-        getDocs(collection(db, "inventory"))
+      const [productsSnap] = await Promise.all([
+        getDocs(collection(db, "products"))
       ]);
 
       const productsMap = new Map();
@@ -57,23 +56,23 @@ export const Inventory: React.FC = () => {
 
       const invData: InventoryItem[] = [];
       
-      inventorySnap.forEach(doc => {
-        const data = doc.data();
-        const productInfo = productsMap.get(data.productId) || {};
+      productsSnap.forEach(doc => {
+        const prod = doc.data();
         
         invData.push({
           id: doc.id,
-          productId: data.productId,
-          product: data.name || productInfo.name || "Unknown Product",
-          sku: data.productId ? data.productId.substring(0, 8).toUpperCase() : "UNKNOWN",
-          category: productInfo.category || "Uncategorized",
-          stock: Number(data.stock) || 0,
-          min: Number(data.minStock) || 0,
-          purchase: Number(data.purchasePrice) || 0,
-          selling: Number(data.sellingPrice) || 0,
-          supplier: data.supplierName || productInfo.supplierName || "N/A"
+          productId: doc.id,
+          product: prod.name || "Unknown Product",
+          sku: prod.sku || `SROS-${doc.id.substring(0, 8).toUpperCase()}`,
+          category: prod.category || "Uncategorized",
+          stock: Number(prod.stock) || 0,
+          min: Number(prod.minStock) || Number(prod.lowStockThreshold) || 5,
+          purchase: Number(prod.costPrice) || 0,
+          selling: Number(prod.price) || 0,
+          supplier: prod.supplierName || "N/A"
         });
       });
+
 
       // Sort by stock logically ascending
       invData.sort((a, b) => a.stock - b.stock);
@@ -92,6 +91,7 @@ export const Inventory: React.FC = () => {
 
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [filterCategory, setFilterCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState<{ key: keyof InventoryItem; direction: 'asc' | 'desc' } | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -105,6 +105,13 @@ export const Inventory: React.FC = () => {
     }
     if (filterCategory !== "All") {
       result = result.filter(item => item.category === filterCategory);
+    }
+    if (searchQuery.trim() !== "") {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(item => 
+        item.product.toLowerCase().includes(q) || 
+        item.sku.toLowerCase().includes(q)
+      );
     }
 
     if (sortConfig) {
@@ -120,7 +127,7 @@ export const Inventory: React.FC = () => {
     }
 
     return result;
-  }, [inventoryItems, filterLowStock, filterCategory, sortConfig]);
+  }, [inventoryItems, filterLowStock, filterCategory, sortConfig, searchQuery]);
 
   // --- Pagination Logic ---
   const [currentPage, setCurrentPage] = useState(1);
@@ -218,6 +225,19 @@ export const Inventory: React.FC = () => {
             Export Data
           </button>
         </motion.div>
+      </div>
+
+      <div className="bg-card p-4 rounded-lg shadow-soft border border-gray-100 flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="relative w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search inventory by product name or SKU..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-200 rounded-lg py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+          />
+        </div>
       </div>
 
       <AnimatePresence>
@@ -340,18 +360,16 @@ export const Inventory: React.FC = () => {
                 const isLowStock = item.stock <= item.min;
                 
                 return (
-                  <motion.tr 
+                   <motion.tr 
                     layout
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     key={item.id} 
-                    className="hover:bg-blue-50/40 transition-colors group"
+                    onClick={() => navigate(`/products/${item.productId}`)}
+                    className="hover:bg-blue-50/40 transition-colors group cursor-pointer"
                   >
-                    <td 
-                      className="px-6 py-4 cursor-pointer"
-                      onClick={() => navigate(`/products/${item.productId}`)}
-                    >
+                    <td className="px-6 py-4">
                       <p className="text-gray-900 font-bold hover:text-primary transition-colors hover:underline underline-offset-4">{item.product}</p>
                       <p className="text-xs text-gray-400 mt-0.5 font-mono">{item.sku}</p>
                     </td>

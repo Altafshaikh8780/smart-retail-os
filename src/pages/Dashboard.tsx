@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, type Variants } from "framer-motion";
 import { DollarSign, ShoppingBag, Package, Users, ArrowUpRight, ArrowDownRight, MoreVertical, PackagePlus, TrendingUp } from "lucide-react";
 import { collection, getDocs, onSnapshot, query, orderBy, limit, where, Timestamp } from "firebase/firestore";
@@ -38,6 +39,9 @@ export const Dashboard: React.FC = () => {
 
   const { settings } = useSettingsStore();
   const currency = settings.currency || "$";
+  const navigate = useNavigate();
+
+  const [secondHandStats, setSecondHandStats] = useState({ revenue: 0, units: 0, sales: 0 });
 
   // Separate states for today's KPIs and chart data
   const [todayOrders, setTodayOrders] = useState<any[]>([]);
@@ -129,20 +133,23 @@ export const Dashboard: React.FC = () => {
         setRecentOrdersList(recent);
         setLoadingStats(false);
 
-        // Real-time low-stock alerts only (lightweight listener)
-        const unsubInv = onSnapshot(collection(db, "inventory"), (snap) => {
+        // Real-time low-stock alerts from products collection (source of truth)
+        const unsubInv = onSnapshot(collection(db, "products"), (snap) => {
           const alerts: any[] = [];
           snap.forEach((doc) => {
             const data = doc.data();
+            if (data.category === "Second-hand") return; // Usually don't restock SH
+
             const stock = Number(data.stock) || 0;
-            const limit = Number(data.minStock) || 0;
-            if (stock <= limit) {
+            const threshold = Number(data.minStock) || Number(data.lowStockThreshold) || 5; // fallback to 5
+
+            if (stock <= threshold) {
               alerts.push({
-                id: doc.id,
-                productId: data.productId, 
+                id: doc.id, // for products navigation
+                productId: doc.id, 
                 product: data.name || "Unknown Product",
                 stock,
-                limit
+                limit: threshold
               });
             }
           });
@@ -180,6 +187,9 @@ export const Dashboard: React.FC = () => {
     let todaysRevenue = 0;
     let todaysOrders = 0;
     let todaysProfit = 0;
+    let shRev = 0;
+    let shUnits = 0;
+    let shSales = 0;
     const uniqueCustomers = new Set<string>();
 
     // Today's KPIs — use lineItems for accurate profit
@@ -189,7 +199,6 @@ export const Dashboard: React.FC = () => {
       const cName = String(order.customer || order.customerName || "").trim().toLowerCase();
       if (cName) uniqueCustomers.add(cName);
 
-      // Profit from lineItems (unit price - cost price) * qty
       if (Array.isArray(order.lineItems)) {
         order.lineItems.forEach((item: any) => {
           const unitPrice = Number(item.unitPrice) || 0;
@@ -200,23 +209,7 @@ export const Dashboard: React.FC = () => {
       }
     });
 
-    // Count customers from week orders for accuracy
-    weekOrders.forEach(order => {
-      const cName = String(order.customer || order.customerName || "").trim().toLowerCase();
-      if (cName) uniqueCustomers.add(cName);
-    });
-
-    const totalStock = products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
-
-    setStatsData([
-      { title: "Today's Revenue", value: `${currency}${todaysRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, trend: "+0.0%", isPositive: true, icon: DollarSign },
-      { title: "Today's Profit",  value: `${currency}${todaysProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, trend: todaysProfit >= 0 ? "+" : "-", isPositive: todaysProfit >= 0, icon: TrendingUp },
-      { title: "Orders Today",     value: todaysOrders.toString(), trend: "+0.0%", isPositive: true, icon: ShoppingBag },
-      { title: "Products in Stock",value: totalStock.toLocaleString(), trend: "Live", isPositive: true, icon: Package },
-      { title: "Active Customers", value: uniqueCustomers.size.toLocaleString(), trend: "7-Day", isPositive: true, icon: Users },
-    ]);
-
-    // Weekly revenue chart from bounded 7-day query
+    // Weekly stats
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
@@ -231,6 +224,9 @@ export const Dashboard: React.FC = () => {
     const productMap: Record<string, { revenue: number; units: number }> = {};
 
     weekOrders.forEach(order => {
+      const cName = String(order.customer || order.customerName || "").trim().toLowerCase();
+      if (cName) uniqueCustomers.add(cName);
+
       let orderDateObj: Date;
       if (order.createdAt?.toDate) {
         orderDateObj = order.createdAt.toDate();
@@ -243,23 +239,42 @@ export const Dashboard: React.FC = () => {
       const dayIndex = last7Days.findIndex(d => d.dateStr === orderDateStr);
       if (dayIndex !== -1) last7Days[dayIndex].revenue += orderTotal;
 
-      // Category from products catalog
       const catalogProduct = products.find(p => p.id === order.productId);
-      const category = catalogProduct?.category || "Uncategorized";
-      categoryMap[category] = (categoryMap[category] || 0) + orderTotal;
+      const mainCategory = catalogProduct?.category || "Uncategorized";
+      categoryMap[mainCategory] = (categoryMap[mainCategory] || 0) + orderTotal;
 
-      // Top products from lineItems
       if (Array.isArray(order.lineItems)) {
+        let hasSH = false;
         order.lineItems.forEach((item: any) => {
           const name = item.name || "Unknown";
-          const rev = (Number(item.unitPrice) || 0) * (Number(item.quantity) || 1);
+          const qty = Number(item.quantity) || 1;
+          const rev = (Number(item.unitPrice) || 0) * qty;
+          
           if (!productMap[name]) productMap[name] = { revenue: 0, units: 0 };
           productMap[name].revenue += rev;
-          productMap[name].units += Number(item.quantity) || 1;
+          productMap[name].units += qty;
+
+          if (item.category === "Second-hand" || item.isSecondHand) {
+            shRev += rev;
+            shUnits += qty;
+            hasSH = true;
+          }
         });
+        if (hasSH) shSales += 1;
       }
     });
 
+    const totalStock = products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
+
+    setStatsData([
+      { title: "Today's Revenue", value: `${currency}${todaysRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, trend: "+0.0%", isPositive: true, icon: DollarSign },
+      { title: "Today's Profit",  value: `${currency}${todaysProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, trend: todaysProfit >= 0 ? "+" : "-", isPositive: todaysProfit >= 0, icon: TrendingUp },
+      { title: "Second-hand (7d)", value: `${currency}${shRev.toLocaleString()}`, trend: `${shUnits} units`, isPositive: true, icon: ShoppingBag },
+      { title: "Products in Stock",value: totalStock.toLocaleString(), trend: "Live", isPositive: true, icon: Package },
+      { title: "Active Customers", value: uniqueCustomers.size.toLocaleString(), trend: "7-Day", isPositive: true, icon: Users },
+    ]);
+
+    setSecondHandStats({ revenue: shRev, units: shUnits, sales: shSales });
     setWeeklyRevenueData(last7Days.map(d => ({ name: d.name, revenue: d.revenue })));
 
     const pieData = Object.keys(categoryMap)
@@ -267,14 +282,13 @@ export const Dashboard: React.FC = () => {
       .filter(x => x.value > 0);
     setSalesByCategoryData(pieData.length > 0 ? pieData : [{ name: "No Sales", value: 1 }]);
 
-    // Top 5 products sorted by 7-day revenue
     const top = Object.entries(productMap)
       .map(([name, v]) => ({ name, revenue: v.revenue, units: v.units }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
     setTopProducts(top);
 
-  }, [todayOrders, weekOrders, products, loadingStats]);
+  }, [todayOrders, weekOrders, products, loadingStats, currency]);
 
   const handleRestockSuccess = (newStock: number) => {
     // Update UI instantly
@@ -353,7 +367,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="h-[300px] w-full">
             <Suspense fallback={<Skeleton className="h-full w-full" />}>
-              <LazyRevenueChart data={weeklyRevenueData} />
+              <LazyRevenueChart data={weeklyRevenueData} currency={currency} />
             </Suspense>
           </div>
         </motion.div>
@@ -368,7 +382,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="h-[300px] w-full">
             <Suspense fallback={<Skeleton className="h-full w-full rounded-full" />}>
-              <LazyCategoryChart data={salesByCategoryData} />
+              <LazyCategoryChart data={salesByCategoryData} currency={currency} />
             </Suspense>
           </div>
         </motion.div>
@@ -386,7 +400,7 @@ export const Dashboard: React.FC = () => {
         <motion.div variants={itemVariants} className="bg-card rounded-lg shadow-soft border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-900">Recent Orders</h3>
-            <button className="text-sm text-primary hover:text-blue-700 font-medium transition-colors">View All</button>
+            <button onClick={() => navigate("/orders")} className="text-sm text-primary hover:text-blue-700 font-medium transition-colors">View All</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -453,33 +467,42 @@ export const Dashboard: React.FC = () => {
               </div>
             ) : (
               lowStockItems.map((alert, idx) => {
-                const stockPercentage = alert.limit > 0 ? (alert.stock / alert.limit) * 100 : 0;
+                const threshold = alert.limit || 5;
+                const stockPercentage = Math.min((alert.stock / threshold) * 100, 100);
                 const isCritical = alert.stock <= 0;
                 
                 return (
-                  <div key={idx} className={`flex items-center justify-between p-4 rounded-lg bg-gray-50 transition-colors border ${isCritical ? 'border-red-200 bg-red-50/30' : 'border-gray-100 hover:border-gray-200'}`}>
+                  <div 
+                    key={idx} 
+                    onClick={() => navigate(`/products/${alert.productId}`)}
+                    className={`flex items-center justify-between p-4 rounded-xl transition-all border cursor-pointer hover:shadow-soft active:scale-[0.98] ${isCritical ? 'border-red-200 bg-red-50/20' : 'border-yellow-200 bg-yellow-50/20 hover:bg-yellow-50/40'}`}
+                  >
                     <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-sm ${isCritical ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600'}`}>
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-sm ${isCritical ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'}`}>
                         <Package className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{alert.product}</p>
-                        <p className={`text-xs ${isCritical ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                          {isCritical ? 'Out of Stock!' : `Only ${alert.stock} left (Limit: ${alert.limit})`}
+                        <p className="text-sm font-bold text-slate-800">{alert.product}</p>
+                        <p className={`text-[10px] uppercase font-bold tracking-tight ${isCritical ? 'text-red-500' : 'text-yellow-600'}`}>
+                          {isCritical ? 'STOCK OUT' : `CRITICAL: ${alert.stock} UNITS LEFT`}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      <div className="w-24 hidden sm:block">
-                        <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                      <div className="hidden sm:block text-right">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Threshold</p>
+                        <p className="text-xs font-bold text-slate-600">{threshold}</p>
+                      </div>
+                      <div className="w-24 hidden lg:block">
+                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                           <div 
-                            className={`h-full rounded-full transition-all duration-1000 ${isCritical ? 'bg-red-600 animate-pulse' : stockPercentage < 30 ? 'bg-red-500' : 'bg-yellow-500'}`} 
-                            style={{ width: `${Math.min(stockPercentage, 100)}%` }}
-                          ></div>
+                            className={`h-full rounded-full transition-all duration-1000 ${isCritical ? 'bg-red-500' : 'bg-yellow-500'}`} 
+                            style={{ width: `${stockPercentage}%` }}
+                          />
                         </div>
                       </div>
                       <button 
-                        onClick={() => setRestockItem(alert)}
+                        onClick={(e) => { e.stopPropagation(); setRestockItem(alert); }}
                         className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-semibold rounded-md shadow-sm transition-colors flex items-center gap-1.5"
                       >
                         <PackagePlus className="w-3.5 h-3.5 text-primary" />
@@ -532,6 +555,58 @@ export const Dashboard: React.FC = () => {
         </motion.div>
       )}
       
+      {/* 6. Second-Hand Market Analytics Section */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        className="bg-card rounded-lg shadow-soft border border-gray-100 overflow-hidden mt-6"
+      >
+        <div className="p-6 border-b border-gray-100 bg-violet-50/20 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-violet-100 rounded-lg">
+              <TrendingUp className="w-5 h-5 text-violet-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">Second-Hand Market Insights <span className="text-sm font-normal text-gray-400 ml-1">(last 7 days)</span></h3>
+          </div>
+          <button onClick={() => navigate("/second-hand")} className="text-sm font-bold text-violet-600 hover:text-violet-700 transition-colors bg-violet-50 px-3 py-1.5 rounded-lg border border-violet-100 shadow-sm">
+            Manage Inventory
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+          <div className="p-8 flex items-center justify-center gap-4 group hover:bg-gray-50/50 transition-colors">
+            <div className="w-12 h-12 rounded-full bg-violet-50 flex items-center justify-center text-violet-600 group-hover:scale-110 transition-transform shadow-sm">
+               <ShoppingBag className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500">Total Units Sold</p>
+              <h4 className="text-2xl font-bold text-gray-900">{secondHandStats.units} units</h4>
+            </div>
+          </div>
+          
+          <div className="p-8 flex items-center justify-center gap-4 group hover:bg-gray-50/50 transition-colors">
+            <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform shadow-sm">
+               <DollarSign className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500">Net Revenue</p>
+              <h4 className="text-2xl font-bold text-green-600">{currency}{secondHandStats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
+            </div>
+          </div>
+          
+          <div className="p-8 flex items-center justify-center gap-4 group hover:bg-gray-50/50 transition-colors">
+            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform shadow-sm">
+               <Users className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500">Transactions</p>
+              <h4 className="text-2xl font-bold text-blue-600">{secondHandStats.sales} orders</h4>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Restock Modal */}
       {restockItem && (
         <RestockModal
@@ -542,6 +617,7 @@ export const Dashboard: React.FC = () => {
           productId={restockItem.productId}
           productName={restockItem.product}
           currentStock={restockItem.stock}
+          minStock={restockItem.limit}
         />
       )}
     </div>

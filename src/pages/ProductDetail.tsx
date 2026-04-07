@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, limit, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -34,6 +34,7 @@ type ProductData = {
   imei?: string;
   sku?: string;
   supplierName?: string;
+  lowStockThreshold?: number;
 };
 
 // No extra mock data needed
@@ -55,7 +56,7 @@ export const ProductDetail: React.FC = () => {
 // Removed auditLogs state
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editFormData, setEditFormData] = useState({ price: 0, stock: 0, description: "", supplierName: "" });
+  const [editFormData, setEditFormData] = useState({ price: 0, stock: 0, description: "", supplierName: "", minStock: 0 });
 
   // AI Restock state
   const [aiResult, setAiResult] = useState<AIRestockResult | null>(null);
@@ -78,6 +79,7 @@ export const ProductDetail: React.FC = () => {
           stock: data.stock || 0,
           description: data.description || "",
           supplierName: (data as any).supplierName || "",
+          minStock: data.minStock || data.lowStockThreshold || 0,
         });
 
          // Audit logs fetch removed
@@ -104,12 +106,27 @@ export const ProductDetail: React.FC = () => {
     if (Number(editFormData.price) <= 0) { toast.error("Price must be greater than 0"); return; }
     if (Number(editFormData.stock) < 0) { toast.error("Stock cannot be negative"); return; }
     try {
-      await updateDoc(doc(db, "products", id), {
+      const pRef = doc(db, "products", id);
+      await updateDoc(pRef, {
         price: Number(editFormData.price),
         stock: Number(editFormData.stock),
+        minStock: Number(editFormData.minStock),
         description: editFormData.description,
         supplierName: editFormData.supplierName,
       });
+
+      // Sync to Inventory
+      const invQ = query(collection(db, "inventory"), where("productId", "==", id), limit(1));
+      const invSnap = await getDocs(invQ);
+      if (!invSnap.empty) {
+        await updateDoc(doc(db, "inventory", invSnap.docs[0].id), {
+          stock: Number(editFormData.stock),
+          minStock: Number(editFormData.minStock),
+          name: product.name,
+          sellingPrice: Number(editFormData.price),
+          lastUpdated: serverTimestamp()
+        });
+      }
       await logActivity({
         action: "product.edited",
         actorId: user?.uid || "Admin",
@@ -144,7 +161,7 @@ export const ProductDetail: React.FC = () => {
     }
   };
 
-  const applyAIRestock = async () => {
+    const applyAIRestock = async () => {
     if (!id || !product || !aiResult) return;
     if (aiResult.suggestedRestockQty <= 0) { toast("No restock needed — stock is sufficient!", { icon: "✅" }); return; }
     setAiApplying(true);
@@ -152,6 +169,16 @@ export const ProductDetail: React.FC = () => {
       const oldStock = product.stock;
       const newStock = oldStock + aiResult.suggestedRestockQty;
       await updateDoc(doc(db, "products", id), { stock: newStock });
+      
+      // Sync to Inventory
+      const invQ = query(collection(db, "inventory"), where("productId", "==", id), limit(1));
+      const invSnap = await getDocs(invQ);
+      if (!invSnap.empty) {
+        await updateDoc(doc(db, "inventory", invSnap.docs[0].id), { 
+          stock: newStock,
+          lastUpdated: serverTimestamp() 
+        });
+      }
       await logActivity({
         action: "inventory.restocked",
         actorId: user?.uid || "Admin",
@@ -275,21 +302,23 @@ export const ProductDetail: React.FC = () => {
           {/* Universal Add to Cart Button */}
           <button
             onClick={() => {
-              if (product.stock <= 0) {
+              if ((product?.stock ?? 0) <= 0) {
                 toast.error("Cannot add out of stock item");
                 return;
               }
-              const img = product.images?.[0]; // Get the first image, or undefined
-              addItem({ 
-                productId: id!, 
-                name: product.name, 
-                price: product.price, 
-                stock: product.stock,
-                image: img // Keep standard logic
+              addItem({
+                productId: id!,
+                name: product!.name,
+                price: product!.price,
+                quantity: 1,
+                stock: product!.stock,
+                image: mainImage || product!.images?.[0] || "",
+                category: product!.category,
+                costPrice: product!.costPrice || 0
               });
-              toast.success(`Added ${product.name} to cart`);
+              toast.success("Added to cart");
             }}
-            disabled={product.stock <= 0}
+            disabled={(product?.stock ?? 0) <= 0}
             className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ShoppingBag className="w-4 h-4" />

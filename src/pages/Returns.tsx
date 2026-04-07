@@ -137,6 +137,18 @@ export const Returns: React.FC = () => {
   const [returns, setReturns] = useState<ReturnRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [initialOrderNumber, setInitialOrderNumber] = useState("");
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const orderNum = params.get("orderNumber");
+    if (orderNum) {
+      setInitialOrderNumber(orderNum);
+      setIsModalOpen(true);
+      // Clean up URL so it doesn't reopen if refreshed
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   React.useEffect(() => {
     const q = query(
@@ -349,7 +361,11 @@ export const Returns: React.FC = () => {
         </div>
       </motion.div>
 
-      <InitiateReturnModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <InitiateReturnModal 
+        isOpen={isModalOpen} 
+        onClose={() => { setIsModalOpen(false); setInitialOrderNumber(""); }} 
+        prefillOrderNumber={initialOrderNumber}
+      />
     </div>
   );
 };

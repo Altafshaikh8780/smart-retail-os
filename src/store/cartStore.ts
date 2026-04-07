@@ -9,6 +9,9 @@ export interface CartItem {
   stock: number;
   image?: string;
   costPrice?: number;
+  category?: string;
+  imeis?: string[];
+  isSecondHand?: boolean;
 }
 
 interface CartStore {
@@ -22,6 +25,7 @@ interface CartStore {
   getSubtotal: () => number;
   getGst: () => number;
   getTotal: () => number;
+  updateIMEI: (productId: string, index: number, imei: string) => void;
 }
 
 export const useCartStore = create<CartStore>()(
@@ -68,6 +72,19 @@ export const useCartStore = create<CartStore>()(
       },
 
       clearCart: () => set({ items: [] }),
+
+      updateIMEI: (productId, index, imei) => {
+        set((state) => ({
+          items: state.items.map((item) => {
+            if (item.productId === productId) {
+              const newImeis = [...(item.imeis || [])];
+              newImeis[index] = imei;
+              return { ...item, imeis: newImeis };
+            }
+            return item;
+          }),
+        }));
+      },
 
       getTotalItems: () => {
         return get().items.reduce((total, item) => total + item.quantity, 0);

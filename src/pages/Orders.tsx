@@ -208,16 +208,14 @@ export const Orders: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
-          {(["all", "Completed", "Pending", "Processing", "Cancelled", "Returned"] as const).map((s) => (
+          {(["all", "Completed", "Returned"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s as any)}
               className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 border-2 ${
                 statusFilter === s 
                   ? s === "Completed" ? "bg-green-500 text-white border-green-500 shadow-lg shadow-green-500/20" :
-                    s === "Cancelled" ? "bg-red-500 text-white border-red-500 shadow-lg shadow-red-500/20" :
                     s === "Returned" ? "bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20" :
-                    s === "Pending" ? "bg-yellow-500 text-white border-yellow-500 shadow-lg shadow-yellow-500/20" :
                     "bg-primary text-white border-primary shadow-lg shadow-primary/20"
                   : "bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200"
               }`}
@@ -298,7 +296,7 @@ export const Orders: React.FC = () => {
                     <td className="px-6 py-4 text-right">
                       {order.status === "Completed" ? (
                         <button 
-                          onClick={() => navigate('/returns')}
+                          onClick={() => navigate(`/returns?orderNumber=${order.orderNumber}`)}
                           className="text-xs font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 hover:text-primary px-3 py-1.5 rounded-lg transition-colors border border-gray-200"
                         >
                           Process Return

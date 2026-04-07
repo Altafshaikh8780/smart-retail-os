@@ -8,7 +8,6 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../lib/auth';
 import { logActivity } from '../lib/activityLogger';
 import { validatePhone, formatCurrency } from '../lib/validations';
-import { DEFAULT_GST_RATE } from '../lib/constants';
 import { useSettingsStore } from '../store/settingsStore';
 
 interface CartDrawerProps {
@@ -17,13 +16,26 @@ interface CartDrawerProps {
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
-  const { items, updateQuantity, removeItem, clearCart, getSubtotal, getGst } = useCartStore();
+  const { items, updateQuantity, removeItem, clearCart, getSubtotal } = useCartStore();
   const { user } = useAuth();
   const { settings } = useSettingsStore();
   const currency = settings.currency || "$";
   
   const [checkoutPhase, setCheckoutPhase] = useState<'cart' | 'checkout'>('cart');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [taxRate, setTaxRate] = useState<number>(0.18);
+  const [isTaxManuallySet, setIsTaxManuallySet] = useState(false);
+  const { updateIMEI } = useCartStore();
+  
+  React.useEffect(() => {
+    if (isTaxManuallySet || items.length === 0) return;
+    const cat = items[0].category || "";
+    let autoTax = 0.18;
+    if (cat === "Second-hand") autoTax = 0;
+    else if (["Accessories"].includes(cat)) autoTax = 0.12;
+    setTaxRate(autoTax);
+  }, [items, isTaxManuallySet]);
   
   const [formData, setFormData] = useState({
     customerName: '',
@@ -97,6 +109,32 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       return;
     }
 
+    let hasImeiError = false;
+    const allImeis = new Set<string>();
+    for (const item of items) {
+      if (item.category === 'Phones' || item.category === 'Mobile' || item.category === 'Laptops') {
+        // Let's enforce IMEI for phones
+        if (item.category === 'Phones' || item.category === 'Mobile') {
+          for (let i = 0; i < item.quantity; i++) {
+            const imei = item.imeis?.[i];
+            if (!imei) {
+              toast.error(`IMEI required for ${item.name}`);
+              hasImeiError = true;
+            } else if (!/^\d+$/.test(imei)) {
+              toast.error(`IMEI must be numeric for ${item.name}`);
+              hasImeiError = true;
+            } else if (allImeis.has(imei)) {
+              toast.error(`Duplicate IMEI detected: ${imei}`);
+              hasImeiError = true;
+            } else {
+              allImeis.add(imei);
+            }
+          }
+        }
+      }
+    }
+    if (hasImeiError) return;
+
     setIsSubmitting(true);
     const toastId = toast.loading("Processing order...");
 
@@ -116,11 +154,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         unitPrice: item.price,
         discount: 0,
         total: item.quantity * item.price,
-        costPrice: item.costPrice || 0
+        costPrice: item.costPrice || 0,
+        imeis: item.imeis || [],
+        isSecondHand: item.category === 'Second-hand' || !!item.isSecondHand
       }));
 
       const subtotal = getSubtotal();
-      const gstAmount = getGst();
+      const gstAmount = subtotal * taxRate;
       const preDiscountTotal = subtotal + gstAmount;
       const discountRate = formData.customerTier === 'VIP' ? 0.02 : formData.customerTier === 'Wholesale' ? 0.05 : 0;
       const discountAmount = preDiscountTotal * discountRate;
@@ -159,6 +199,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         customer: formData.customerName,
         total: finalTotal,
         gst: gstAmount,
+        taxRate: taxRate,
         paymentMethod: formData.paymentMethod,
         status: "Completed",
         date: today,
@@ -198,23 +239,32 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       // Note: We are relying on the UI checks to prevent quantity > stock, 
       // but in a fully strict environment, we would re-fetch and validate here.
       for (const item of items) {
-        // Update products collection
         const productRef = doc(db, "products", item.productId);
-        const newStock = item.stock - item.quantity;
-        batch.update(productRef, {
-          stock: newStock,
-          lastUpdated: serverTimestamp()
-        });
-
-        // Update inventory collection
         const invQuery = query(collection(db, "inventory"), where("productId", "==", item.productId));
         const invSnap = await getDocs(invQuery);
-        if (!invSnap.empty) {
-          const invDoc = invSnap.docs[0];
-          batch.update(doc(db, "inventory", invDoc.id), {
+
+        if (item.category === "Second-hand") {
+          // Delete second-hand product completely
+          batch.delete(productRef);
+          if (!invSnap.empty) {
+            batch.delete(doc(db, "inventory", invSnap.docs[0].id));
+          }
+        } else {
+          // Update products collection
+          const newStock = item.stock - item.quantity;
+          batch.update(productRef, {
             stock: newStock,
             lastUpdated: serverTimestamp()
           });
+
+          // Update inventory collection
+          if (!invSnap.empty) {
+            const invDoc = invSnap.docs[0];
+            batch.update(doc(db, "inventory", invDoc.id), {
+              stock: newStock,
+              lastUpdated: serverTimestamp()
+            });
+          }
         }
       }
 
@@ -366,6 +416,23 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                                 {formatCurrency(item.price * item.quantity, currency)}
                               </span>
                             </div>
+                            
+                            {/* IMEI Inputs */}
+                            {(item.category === 'Phones' || item.category === 'Mobile') && (
+                                <div className="mt-3 space-y-2 border-t border-gray-100 pt-2">
+                                  {Array.from({ length: item.quantity }).map((_, idx) => (
+                                    <input 
+                                      key={idx}
+                                      placeholder={`IMEI for unit ${idx + 1} (Numeric)`}
+                                      value={item.imeis?.[idx] || ''}
+                                      onChange={(e) => updateIMEI(item.productId, idx, e.target.value.replace(/\D/g, ''))}
+                                      className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 bg-gray-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                      required
+                                    />
+                                  ))}
+                                </div>
+                            )}
+
                           </div>
                         </div>
                       ))}
@@ -505,24 +572,40 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             {items.length > 0 && (
               <div className="border-t border-gray-100 bg-gray-50/50 p-6 space-y-4">
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between text-gray-600 items-center">
                     <span>Subtotal</span>
                     <span className="font-semibold">{formatCurrency(getSubtotal(), currency)}</span>
                   </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>GST ({(DEFAULT_GST_RATE * 100).toFixed(0)}%)</span>
-                    <span className="font-semibold">{formatCurrency(getSubtotal() * DEFAULT_GST_RATE, currency)}</span>
+                  <div className="flex justify-between text-gray-600 items-center">
+                    <div className="flex items-center gap-2">
+                      <span>GST / Tax</span>
+                      <select 
+                        value={taxRate.toString()} 
+                        onChange={(e) => {
+                          setTaxRate(Number(e.target.value));
+                          setIsTaxManuallySet(true);
+                        }}
+                        className="bg-gray-100 border-none text-xs rounded px-1.5 py-0.5 focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="0">0%</option>
+                        <option value="0.05">5%</option>
+                        <option value="0.12">12%</option>
+                        <option value="0.18">18%</option>
+                        <option value="0.28">28%</option>
+                      </select>
+                    </div>
+                    <span className="font-semibold">{formatCurrency(getSubtotal() * taxRate, currency)}</span>
                   </div>
                   {(formData.customerTier !== 'Standard') && (
-                    <div className="flex justify-between text-green-600 font-bold">
+                    <div className="flex justify-between text-green-600 font-bold items-center">
                       <span>Tier Discount ({formData.customerTier === 'VIP' ? '2%' : '5%'})</span>
-                      <span>-{formatCurrency(((getSubtotal() * (1 + DEFAULT_GST_RATE)) * (formData.customerTier === 'VIP' ? 0.02 : 0.05)), currency)}</span>
+                      <span>-{formatCurrency(((getSubtotal() * (1 + taxRate)) * (formData.customerTier === 'VIP' ? 0.02 : 0.05)), currency)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t border-gray-200">
                     <span>Total</span>
                     <span className="text-primary">
-                      {formatCurrency(((getSubtotal() * (1 + DEFAULT_GST_RATE)) * (1 - (formData.customerTier === 'VIP' ? 0.02 : formData.customerTier === 'Wholesale' ? 0.05 : 0))), currency)}
+                      {formatCurrency(((getSubtotal() * (1 + taxRate)) * (1 - (formData.customerTier === 'VIP' ? 0.02 : formData.customerTier === 'Wholesale' ? 0.05 : 0))), currency)}
                     </span>
                   </div>
                 </div>
@@ -552,7 +635,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                       {isSubmitting ? (
                         <><Loader2 className="w-5 h-5 animate-spin mr-2" /> Processing...</>
                       ) : (
-                        `Pay ${formatCurrency(((getSubtotal() * (1 + DEFAULT_GST_RATE)) * (1 - (formData.customerTier === 'VIP' ? 0.02 : formData.customerTier === 'Wholesale' ? 0.05 : 0))), currency)}`
+                        `Pay ${formatCurrency(((getSubtotal() * (1 + taxRate)) * (1 - (formData.customerTier === 'VIP' ? 0.02 : formData.customerTier === 'Wholesale' ? 0.05 : 0))), currency)}`
                       )}
                     </button>
                   </div>

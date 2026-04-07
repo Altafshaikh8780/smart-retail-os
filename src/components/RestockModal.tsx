@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, Sparkles, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import { doc, updateDoc, increment } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { calculateRestockRecommendation } from "../lib/aiRestock";
 
 interface RestockModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface RestockModalProps {
   productId: string;
   productName: string;
   currentStock: number;
+  minStock?: number;
 }
 
 export const RestockModal: React.FC<RestockModalProps> = ({ 
@@ -22,15 +24,39 @@ export const RestockModal: React.FC<RestockModalProps> = ({
   inventoryId,
   productId,
   productName,
-  currentStock
+  currentStock,
+  minStock = 10
 }) => {
-  // AI Mock Logic
-  const suggestedQty = React.useMemo(() => Math.max(20, Math.floor(Math.random() * 50) + 20), []);
-  const salesVelocity = React.useMemo(() => Math.max(1, Math.floor(Math.random() * 5)), []);
-  const runOutDays = React.useMemo(() => Math.floor(currentStock / salesVelocity) || 0, [currentStock, salesVelocity]);
-
-  const [quantity, setQuantity] = useState<string>(suggestedQty.toString());
+  const [quantity, setQuantity] = useState<string>("0");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiData, setAiData] = useState<{ suggested: number; velocity: number; runOut: number } | null>(null);
+
+  useEffect(() => {
+    if (isOpen && productId) {
+      const fetchRecommendation = async () => {
+        setAiLoading(true);
+        try {
+          const result = await calculateRestockRecommendation(productId, currentStock, minStock);
+          setAiData({
+            suggested: result.suggestedRestockQty,
+            velocity: result.dailySales,
+            runOut: Math.floor(currentStock / (result.dailySales || 1))
+          });
+          setQuantity(result.suggestedRestockQty.toString());
+        } catch (error) {
+          console.error("AI Recommendation failed:", error);
+          // Fallback to min-stock logic
+          const fallback = Math.max(0, minStock - currentStock);
+          setAiData({ suggested: fallback, velocity: 0, runOut: 0 });
+          setQuantity(fallback.toString());
+        } finally {
+          setAiLoading(false);
+        }
+      };
+      fetchRecommendation();
+    }
+  }, [isOpen, productId, currentStock, minStock]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +85,7 @@ export const RestockModal: React.FC<RestockModalProps> = ({
       
       onSuccess(currentStock + qty);
       
-      setQuantity(suggestedQty.toString()); // Reset
+      setQuantity(aiData?.suggested.toString() || "0"); // Reset
       onClose();
     } catch (error: any) {
       console.error("Restock error:", error);
@@ -113,17 +139,29 @@ export const RestockModal: React.FC<RestockModalProps> = ({
                 <span className="text-lg font-bold text-gray-900">{currentStock}</span>
               </div>
 
-              <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-4 space-y-3">
+              <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-4 space-y-3 relative overflow-hidden">
+                {aiLoading && (
+                  <div className="absolute inset-0 bg-purple-50/80 backdrop-blur-[1px] flex items-center justify-center z-10">
+                    <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-purple-700 font-bold text-sm">
                   <Sparkles className="w-4 h-4" /> AI Insights
                 </div>
                 <div className="text-xs text-purple-800 space-y-1 font-medium">
-                  <p>• Sales Velocity: ~{salesVelocity} units/day</p>
-                  <p>• Est. Run Out Date: {runOutDays <= 0 ? 'Immediately' : `in ${runOutDays} days`}</p>
-                  <p>• Recommended Restock: <strong>{suggestedQty} units</strong></p>
+                  <p>• Sales Velocity: ~{aiData?.velocity || 0} units/day</p>
+                  <p>• Est. Run Out Date: {aiData?.runOut && aiData.runOut > 0 ? `in ${aiData.runOut} days` : 'Immediately'}</p>
+                  <p>• Recommended Restock: <strong>{aiData?.suggested || 0} units</strong></p>
                 </div>
                 <div className="flex gap-2 mt-2">
-                  <button type="button" onClick={() => setQuantity(suggestedQty.toString())} className="flex-1 bg-purple-600 text-white py-1.5 rounded-md text-xs font-bold hover:bg-purple-700 flex justify-center items-center gap-1"><Check className="w-3 h-3"/> Approve AI Suggestion</button>
+                  <button 
+                    type="button" 
+                    onClick={() => setQuantity(aiData?.suggested.toString() || "0")} 
+                    className="flex-1 bg-purple-600 text-white py-1.5 rounded-md text-xs font-bold hover:bg-purple-700 flex justify-center items-center gap-1"
+                    disabled={aiLoading}
+                  >
+                    <Check className="w-3 h-3"/> Approve AI Suggestion
+                  </button>
                 </div>
               </div>
 
@@ -131,14 +169,14 @@ export const RestockModal: React.FC<RestockModalProps> = ({
                 <label className="block text-sm font-semibold text-gray-900 mb-1.5">Manual Override Quantity</label>
                 <input 
                   type="number" 
-                  min="1" 
+                  min="0" 
                   step="1"
                   required 
                   value={quantity} 
                   onChange={e => setQuantity(e.target.value)} 
                   className="w-full border border-gray-200 rounded-lg py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium bg-white" 
                   placeholder="e.g. 50" 
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || aiLoading}
                 />
               </div>
 

@@ -26,7 +26,7 @@ const DEFAULT_CONFIG: AIRestockConfig = {
   leadTimeDays: 5,
   safetyStock: 5,
   lookbackDays: 7,
-  maxRestockCap: 500,
+  maxRestockCap: 100,
 };
 
 /**
