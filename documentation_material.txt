@@ -1,0 +1,167 @@
+# SMART RETAIL OS – COMPREHENSIVE SYSTEM DOCUMENTATION
+=====================================================
+
+1. PROJECT SUMMARY
+------------------
+Smart Retail OS is a modern, high-performance retail management and Point-of-Sale (POS) system specifically engineered for high-value electronics and mobile retail businesses. Built with an "Offline-First" philosophy, it ensures business continuity by maintaining core billing and inventory operations during internet outages, synchronizing data to the cloud automatically when connectivity is restored.
+
+1.1 Core Objectives:
+- High Reliability: Seamless offline operations.
+- Inventory Integrity: Granular tracking of IMEI and Serial numbers.
+- AI Efficiency: Predictive inventory restocking to optimize cash flow.
+- Fast Checkout: Optimized POS workflow for rapid customer throughput.
+- Professionalism: Automated, high-quality PDF invoice generation.
+
+2. SYSTEM ARCHITECTURE
+----------------------
+The application follows a modern Serverless Client-Side Architecture.
+
+2.1 Frontend Stack:
+- Framework: React 18 with Vite 8.0 for lightning-fast builds and HMR.
+- Styling: Tailwind CSS for a premium, responsive, and customizable design system.
+- Icons: Lucide-react for consistent, crisp iconography.
+- Charts: Recharts for interactive analytics visualizations.
+- State Management: 
+  - Zustand: Global application state (Cart, User preferences, Modals).
+  - React Context: User authentication state.
+- Notifications: React Toastify for real-time user feedback.
+
+2.2 Backend & Persistence:
+- Primary Database: Google Firebase Firestore (NoSQL, real-time).
+- Authentication: Firebase Auth (Email/Password & JWT-based session management).
+- Cloud Storage: Cloudinary (Image processing, CDN, and storage).
+- Offline Strategy: Firestore `persistentLocalCache` (IndexedDB) for local data persistence.
+
+3. DATABASE SCHEMA (FIRESTORE COLLECTIONS)
+------------------------------------------
+The system uses a flat but highly relational NoSQL structure.
+
+3.1 `products`:
+- Fields: `id` (Auto-ID), `name` (String), `sku` (String), `price` (Number), `costPrice` (Number), `stock` (Number), `category` (String), `imei` (Array<String>), `isSecondHand` (Boolean), `shDetails` (Object), `minThreshold` (Number), `description` (String), `images` (Array<String>).
+- Usage: Stores the master inventory list.
+
+3.2 `orders` (Invoices):
+- Fields: `orderNumber` (Unique String), `customerId` (ID), `customerName` (String), `lineItems` (Array of Product Objects), `total` (Number), `subtotal` (Number), `gst` (Number), `discount` (Number), `paymentMethod` (String), `status` ("Completed", "Returned"), `createdAt` (Timestamp), `date` (ISO Date).
+- Usage: Permanent record of every sales transaction.
+
+3.3 `customers`:
+- Fields: `name` (String), `phone` (String, Unique), `email` (String), `address` (String), `totalSpent` (Number), `orderCount` (Number), `lastVisit` (Timestamp).
+- Usage: CRM and loyalty metrics.
+
+3.4 `employees` (Users):
+- Fields: `uid` (Auth ID), `name` (String), `email` (String), `role` ("Admin", "Employee"), `storeId` (String).
+- Usage: Identity management and RBAC.
+
+3.5 `returns`:
+- Fields: `returnId` (String), `orderId` (String), `customer` (Object), `products` (Array), `reason` (String), `refundAmount` (Number), `status` ("Processed"), `processedBy` (Name), `date` (ISO Date).
+- Usage: Tracks refund and stock restoration history.
+
+3.6 `device_serials`:
+- Fields: `productId` (ID), `productName` (String), `serialNumber` (String/IMEI), `status` ("Available", "Sold", "Returned"), `customerId` (ID), `orderId` (String), `lastUpdated` (Timestamp).
+- Usage: Granular lookup for individual units for warranty and return tracking.
+
+3.7 `activityLogs`:
+- Fields: `action` (String), `actorId` (ID), `actorName` (String), `targetId` (ID), `targetName` (String), `meta` (Object), `createdAt` (Timestamp).
+- Usage: Audit trail for every significant system change.
+
+3.8 `settings`:
+- Fields: `storeName`, `currency`, `storeAddress`, `gstNumber`, `taxRate`, `leadTimeDays`, `safetyStock`.
+- Usage: Global config for dynamic UI and calculation updates.
+
+4. MODULE-BY-MODULE FEATURE BREAKDOWN
+-------------------------------------
+
+4.1 Dashboard & Analytics:
+- Summary Cards: Real-time Revenue, Profit, Total Orders, and Low Stock counts.
+- Sales Velocity: Line charts showing revenue trends over the last 7 or 30 days.
+- Inventory Health: Donut charts illustrating stock distribution by category.
+- Recent Activity: Live feed of latest logs (orders, returns, stock additions).
+
+4.2 Inventory Management:
+- Global Search: Real-time filtering by Name, SKU, or Category.
+- Detailed Profiles: View specific stock levels, profit margins, and sales history for each product.
+- Stock Restoring: Manually update stock or trigger automatic increments via the Return flow.
+- Low Stock Alerts: Visual cues when stock dips below the defined `minThreshold`.
+
+4.3 POS & Billing (Checkout):
+- Interactive Cart: Add products by search or clicking from the inventory grid.
+- Dynamic Pricing: Automatically handles GST calculations and applies discretionary discounts.
+- Customer CRM Integration: Search existing customers by phone number or create a new profile directly in the checkout screen.
+- Invoice Generation: Produces a professional PDF including Store Branding, GST details, Items, and Totals using `jsPDF`.
+
+4.4 AI Restock Engine:
+- Lookback Data: Analyzes the last 7 days of actual sales volume.
+- Forecasting Equation: Recommended = (Daily Sales × Lead Time) + Safety Stock.
+- Smart Suggestions: Only alerts the user if the "Ideal Stock" exceeds current levels.
+- Bulk Action: Approve multiple restock suggestions with a single click.
+
+4.5 Return Management:
+- Seamless Workflow: Find an order, click "Return," select items, and process.
+- Automated Restoration: Instantly restores product stock and marks IMEI as "Returned."
+- History Tracking: Maintain a full archive of all returns including reasons and values.
+
+4.6 Second-Hand Module:
+- specialized tracking for pre-owned electronics.
+- custom fields for "Condition", "Battery Health", and "Repair History."
+- Unique "SH" (Second-hand) tagging to distinguish from new stock.
+
+5. CORE APPLICATION FLOWS
+-------------------------
+
+5.1 The Checkout Flow (Step-by-Step):
+1. User adds items to the Zustand-managed Cart.
+2. User selects/creates a Customer profile.
+3. System fetches real-time prices and stock levels.
+4. User selects a Payment method (Cash/UPI/Card/Split).
+5. On Click "Complete Order":
+   - Firestore `runTransaction` starts.
+   - Products stock decremented.
+   - Device serial status changed to "Sold."
+   - Order document saved.
+   - Customer loyalty stats updated.
+   - Activity log written.
+   - PDF downloaded for the customer.
+
+5.2 The Return Flow (Step-by-Step):
+1. Admin navigates to the Orders page.
+2. Clicks "Process Return" on the specific invoice.
+3. Selects items (individual items from a multi-item order).
+4. System executes atomic updates:
+   - Increments product stock.
+   - Reverts serial status to "Returned/Available."
+   - Updates order status to "Returned."
+   - Creates a new entry in `returns` collection.
+
+6. API & DATA HANDLING
+----------------------
+
+6.1 Firebase SDK (v12):
+- How: Direct client-to-cloud connection via Firebase Web SDK.
+- Usage: `getDocs` for lists, `addDoc`/`setDoc` for saves, `onSnapshot` for real-time reactivity (Live updates).
+- Resilience: `persistentLocalCache` allows the app to function without any lag even with spotty internet.
+
+6.2 Cloudinary API (v1.1):
+- How: Uses the `upload_preset` mechanism for "Unsigned Uploads."
+- Workflow: User selects file -> App sends POST to Cloudinary endpoint -> Cloudinary returns secure HTTPS URL -> App stores URL in Firestore.
+- Benefit: Offloads heavy image processing and storage from the main database.
+
+6.3 jsPDF & autoTable:
+- Usage: Heavily customized logic to transform JSON order data into print-ready PDF documents.
+- Includes: Dynamic table generation, custom fonts, and store-specific headers.
+
+7. DEPLOYMENT & INFRASTRUCTURE
+------------------------------
+- Deployment: Production is hosted on Vercel for high-availability and global CDN distribution.
+- CI/CD: Automated deployments triggered from the main GitHub branch.
+- Environment: Vite-based environment variables (`VITE_` prefix) ensure API keys are injected at build time but never hardcoded in the source.
+
+8. SECURITY & ROLES (RBAC)
+--------------------------
+- Admin: Unlimited access to Financials, Settings, and User Management. Can delete records.
+- Employee: Restricted to POS, Customer Management, and standard Inventory views. Hidden: Cost Prices, Profit Margins, and Global Settings.
+
+---
+End of Documentation
+Smart Retail OS v2.0
+April 7, 2026
+Documentation Specialist: Antigravity AI

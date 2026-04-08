@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Search, Smartphone, Laptop, Tablet, Headphones, Cpu, RefreshCw, AlertCircle, CheckCircle, Package, Loader2, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { collection, getDocs, doc, deleteDoc, query, where, limit, startAfter, orderBy, QueryDocumentSnapshot } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, query, where, orderBy } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../lib/auth";
-import { useSettingsStore } from "../store/settingsStore";
 import { AddProductModal } from "../components/AddProductModal";
 import { exportProductsCSV } from "../lib/csvExport";
+import { formatCurrency } from "../lib/validations";
 
 // --- Data Contracts ---
 const CATEGORIES = ["All", "Phones", "Laptops", "Tablets", "Accessories", "Small Electronics", "Second-hand"];
@@ -41,18 +41,21 @@ const getCategoryIcon = (category: string) => {
 
 export const Products: React.FC = () => {
   const { role } = useAuth();
-  const { settings } = useSettingsStore();
-  const currency = settings.currency || "₹";
   const navigate = useNavigate();
-  const [products, setProducts] = useState<Product[]>([]);
+  
+  // Products Data State
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [visibleLimit, setVisibleLimit] = useState(15);
   const [loading, setLoading] = useState(true);
+  
+  // UI States
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
-
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [stockFilter, setStockFilter] = useState<"all" | "low" | "out">("all");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [stockFilter, setStockFilter] = useState<"all" | "low" | "out">("all");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const LIMIT_STEP = 15;
 
   // Debounce search input (150ms)
   useEffect(() => {
@@ -60,40 +63,11 @@ export const Products: React.FC = () => {
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  // Pagination State
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const PAGE_SIZE = 15;
-
-  const fetchProducts = async (isLoadMore = false) => {
+  const fetchAllProducts = async () => {
     try {
-      if (!isLoadMore) setLoading(true);
-      
-      let q;
-      if (isLoadMore && lastDoc) {
-        q = query(
-          collection(db, "products"),
-          orderBy("name"),
-          startAfter(lastDoc),
-          limit(PAGE_SIZE)
-        );
-      } else {
-        q = query(
-          collection(db, "products"),
-          orderBy("name"),
-          limit(PAGE_SIZE)
-        );
-      }
-      
+      setLoading(true);
+      const q = query(collection(db, "products"), orderBy("name"));
       const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
-        if (querySnapshot.docs.length < PAGE_SIZE) setHasMore(false);
-        else setHasMore(true);
-      } else {
-        setHasMore(false);
-      }
       
       const productsData: Product[] = [];
       querySnapshot.forEach((doc) => {
@@ -112,14 +86,7 @@ export const Products: React.FC = () => {
         });
       });
 
-      if (isLoadMore) {
-        setProducts(prev => {
-          const newProducts = productsData.filter(d => !prev.some(p => p.id === d.id));
-          return [...prev, ...newProducts];
-        });
-      } else {
-        setProducts(productsData);
-      }
+      setAllProducts(productsData);
     } catch (error: any) {
       console.error("Error fetching products:", error);
       toast.error("Failed to fetch products.");
@@ -128,39 +95,31 @@ export const Products: React.FC = () => {
     }
   };
 
-  const handleDeleteProduct = async (e: React.MouseEvent, productId: string) => {
-    e.stopPropagation(); // Prevent opening detail view
-    // For QA Automation: skip native window.confirm which blocks focus/subagents
-    // In production, this would be a custom UI modal.
+  useEffect(() => {
+    fetchAllProducts();
+  }, []);
 
-    
+  const handleDeleteProduct = async (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
     try {
       const toastId = toast.loading("Deleting product...");
-      
-      // Delete from products collection
       await deleteDoc(doc(db, "products", productId));
       
-      // Synchronously delete referencing inventory records
       const invQuery = query(collection(db, "inventory"), where("productId", "==", productId));
       const invSnap = await getDocs(invQuery);
       const deletePromises = invSnap.docs.map(d => deleteDoc(doc(db, "inventory", d.id)));
       await Promise.all(deletePromises);
       
       toast.dismiss(toastId);
-      toast.success("Product and inventory records deleted successfully");
-      // Rapid UI update without full refetch
-      setProducts(prev => prev.filter(p => p.id !== productId));
+      toast.success("Product deleted successfully");
+      setAllProducts(prev => prev.filter(p => p.id !== productId));
     } catch (error: any) {
       toast.error("Failed to delete product: " + error.message);
     }
   };
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+    return allProducts.filter((product) => {
       const matchesSearch =
         product.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         product.brand.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
@@ -172,7 +131,13 @@ export const Products: React.FC = () => {
         stockFilter === "out" ? product.stock === 0 : true;
       return matchesSearch && matchesCategory && matchesStock;
     });
-  }, [products, debouncedSearch, activeCategory, stockFilter]);
+  }, [allProducts, debouncedSearch, activeCategory, stockFilter]);
+
+  const visibleProducts = useMemo(() => {
+    return filteredProducts.slice(0, visibleLimit);
+  }, [filteredProducts, visibleLimit]);
+
+  const hasMore = visibleLimit < filteredProducts.length;
 
   return (
     <div className="space-y-6 pb-8">
@@ -234,7 +199,6 @@ export const Products: React.FC = () => {
           />
         </div>
 
-          {/* Stock filter pills */}
           <div className="flex items-center gap-2">
             {(["all", "low", "out"] as const).map((f) => (
               <button
@@ -250,12 +214,14 @@ export const Products: React.FC = () => {
               </button>
             ))}
           </div>
-          {/* Category pills - Horizontal Scrollable Chips */}
           <div className="flex items-center gap-3 overflow-x-auto pb-4 pt-2 -mx-4 px-4 no-scrollbar scroll-smooth">
             {CATEGORIES.map((category) => (
               <button
                 key={category}
-                onClick={() => setActiveCategory(category)}
+                onClick={() => {
+                  setActiveCategory(category);
+                  setVisibleLimit(LIMIT_STEP); // Reset limit on filter change
+                }}
                 className={`whitespace-nowrap px-6 py-2.5 rounded-2xl text-sm font-bold transition-all duration-300 border shadow-sm ${
                   activeCategory === category 
                     ? "bg-primary text-white border-primary" 
@@ -277,7 +243,7 @@ export const Products: React.FC = () => {
       ) : (
         <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
           <AnimatePresence mode="popLayout">
-            {filteredProducts.map((product) => {
+            {visibleProducts.map((product) => {
               const Icon = getCategoryIcon(product.category);
               const isLowStock = product.stock > 0 && product.stock <= 5;
               const isOutOfStock = product.stock === 0;
@@ -307,7 +273,6 @@ export const Products: React.FC = () => {
                     </button>
                   )}
 
-                  {/* Product Image Placeholder */}
                   <div className="aspect-square bg-gray-50 flex items-center justify-center relative border-b border-gray-100 group-hover:bg-primary/5 transition-colors overflow-hidden">
                     {product.images && product.images.length > 0 ? (
                       <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -319,15 +284,13 @@ export const Products: React.FC = () => {
                     </div>
                   </div>
                   
-                  {/* Product Details */}
                   <div className="p-4 flex-1 flex flex-col">
                     <h3 className="font-semibold text-gray-900 truncate" title={product.name}>{product.name}</h3>
                     <p className="text-xs text-gray-500 mt-1">{product.category}</p>
                     
                     <div className="mt-4 flex items-end justify-between mt-auto">
-                      <span className="text-lg font-bold text-gray-900">{currency}{product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="text-lg font-bold text-gray-900">{formatCurrency(product.price)}</span>
                       
-                      {/* Stock Indicator */}
                       <div className="flex items-center gap-1.5" title={`${product.stock} in stock`}>
                         {product.stock > 10 ? (
                           <>
@@ -352,7 +315,6 @@ export const Products: React.FC = () => {
         </motion.div>
       )}
       
-      {/* Empty State */}
       {!loading && filteredProducts.length === 0 && (
         <motion.div 
           initial={{ opacity: 0 }} 
@@ -363,28 +325,25 @@ export const Products: React.FC = () => {
             <Search className="w-8 h-8 text-gray-400" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900">No products found</h3>
-          <p className="text-gray-500 max-w-sm mt-1">We couldn't find any products matching your search or filter criteria in the database.</p>
+          <p className="text-gray-500 max-w-sm mt-1">We couldn't find any products matching your search or filter criteria.</p>
         </motion.div>
       )}
 
-      {/* Pagination Load More */}
-      {hasMore && !searchQuery && activeCategory === "All" && (
+      {hasMore && (
         <div className="flex justify-center pt-8 pb-4">
           <button
-            onClick={() => fetchProducts(true)}
-            disabled={loading}
-            className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors shadow-sm flex items-center justify-center min-w-[140px]"
+            onClick={() => setVisibleLimit(prev => prev + LIMIT_STEP)}
+            className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center justify-center min-w-[140px]"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Load More"}
+            Load More
           </button>
         </div>
       )}
 
-      {/* Add Product Modal Component */}
       <AddProductModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        onSuccess={fetchProducts} 
+        onSuccess={fetchAllProducts} 
       />
     </div>
   );

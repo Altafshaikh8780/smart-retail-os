@@ -23,7 +23,8 @@ function toCSV(rows: Record<string, any>[], columns: { key: string; label: strin
 function downloadCSV(filename: string, csv: string): void {
   // Add professional branding / watermark as first line of CSV
   const brandedCSV = "--- GENERATED VIA SMART RETAIL OS ---\r\n" + csv;
-  const blob = new Blob([brandedCSV], { type: "text/csv;charset=utf-8;" });
+  // \uFEFF is the UTF-8 BOM, which helps Excel recognize the character encoding
+  const blob = new Blob(["\uFEFF" + brandedCSV], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -42,8 +43,8 @@ export function exportProductsCSV(products: any[]): void {
     { key: "brand", label: "Brand" },
     { key: "category", label: "Category" },
     { key: "sku", label: "SKU" },
-    { key: "price", label: "Selling Price", format: (v: any) => Number(v).toFixed(2) },
-    { key: "costPrice", label: "Cost Price", format: (v: any) => Number(v).toFixed(2) },
+    { key: "price", label: "Selling Price", format: (v: any) => Number(v).toString() },
+    { key: "costPrice", label: "Cost Price", format: (v: any) => Number(v).toString() },
     { key: "stock", label: "Stock" },
   ];
   const csv = toCSV(products, columns);
@@ -56,8 +57,8 @@ export function exportOrdersCSV(orders: any[]): void {
     { key: "customer", label: "Customer" },
     { key: "date", label: "Date" },
     { key: "items", label: "Items" },
-    { key: "total", label: "Total", format: (v: any) => Number(v).toFixed(2) },
-    { key: "gst", label: "GST", format: (v: any) => Number(v).toFixed(2) },
+    { key: "total", label: "Total", format: (v: any) => Number(v).toString() },
+    { key: "gst", label: "GST", format: (v: any) => Number(v).toString() },
     { key: "paymentMethod", label: "Payment Method" },
     { key: "status", label: "Status" },
   ];

@@ -8,7 +8,6 @@ import toast from "react-hot-toast";
 import { Skeleton } from "../components/Skeleton";
 import { StatCard } from "../components/ui/StatCard";
 import { Badge } from "../components/ui/Badge";
-import { useSettingsStore } from "../store/settingsStore";
 import { formatCurrency } from "../lib/validations";
 
 // --- Animation Variants ---
@@ -36,8 +35,6 @@ type InventoryItem = {
 };
 
 export const Inventory: React.FC = () => {
-  const { settings } = useSettingsStore();
-  const currency = settings.currency || "₹";
   const navigate = useNavigate();
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,14 +42,7 @@ export const Inventory: React.FC = () => {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const [productsSnap] = await Promise.all([
-        getDocs(collection(db, "products"))
-      ]);
-
-      const productsMap = new Map();
-      productsSnap.forEach(doc => {
-        productsMap.set(doc.id, doc.data());
-      });
+      const productsSnap = await getDocs(collection(db, "products"));
 
       const invData: InventoryItem[] = [];
       
@@ -72,7 +62,6 @@ export const Inventory: React.FC = () => {
           supplier: prod.supplierName || "N/A"
         });
       });
-
 
       // Sort by stock logically ascending
       invData.sort((a, b) => a.stock - b.stock);
@@ -160,21 +149,22 @@ export const Inventory: React.FC = () => {
       `"${item.category}"`,
       item.stock,
       item.min,
-      `${formatCurrency(item.purchase, currency)}`,
-      `${formatCurrency(item.selling, currency)}`,
+      item.purchase,
+      item.selling,
       item.stock <= 0 ? "Out of Stock" : item.stock <= item.min ? "Low Stock" : "In Stock",
       exportDate
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success("Inventory strictly exported to CSV");
+    toast.success("Inventory exported to CSV (raw numbers)");
   };
 
   const totalValue = useMemo(() => {
@@ -188,8 +178,9 @@ export const Inventory: React.FC = () => {
   const inventoryStats = [
     { title: "Total Products", value: inventoryItems.length.toString(), icon: Package, color: "text-blue-500", bg: "bg-blue-100" },
     { title: "Low Stock Items", value: lowStockCount.toString(), icon: AlertTriangle, color: "text-orange-500", bg: "bg-orange-100" },
-    { title: "Inventory Value", value: formatCurrency(totalValue, currency), icon: DollarSign, color: "text-green-500", bg: "bg-green-100" },
+    { title: "Inventory Value", value: formatCurrency(totalValue), icon: DollarSign, color: "text-green-500", bg: "bg-green-100" },
   ];
+
   return (
     <div className="space-y-6 pb-8">
       {/* 1. Header */}
@@ -405,8 +396,8 @@ export const Inventory: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="text-gray-500 text-xs">Buy: {formatCurrency(item.purchase, currency)}</span>
-                        <span className="text-gray-900 font-medium mt-0.5">Sell: {formatCurrency(item.selling, currency)}</span>
+                        <span className="text-gray-500 text-xs">Buy: {formatCurrency(item.purchase)}</span>
+                        <span className="text-gray-900 font-medium mt-0.5">Sell: {formatCurrency(item.selling)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-600 truncate max-w-[120px]" title={item.supplier}>

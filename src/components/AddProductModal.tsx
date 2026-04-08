@@ -6,6 +6,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { uploadMultipleImages } from "../lib/cloudinary";
 import { useSettingsStore } from "../store/settingsStore";
+import { sanitizePrice } from "../lib/validations";
 
 const CATEGORIES = ["Phones", "Laptops", "Tablets", "Accessories", "Small Electronics", "Second-hand"];
 
@@ -24,7 +25,6 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { settings } = useSettingsStore();
-  const currency = settings.currency || "$";
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -57,8 +57,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
       toastId = toast.loading("Saving product...");
 
-      const sellingPrice = Number(formData.price);
-      const costPrice = Number(formData.costPrice);
+      const sellingPrice = sanitizePrice(formData.price);
+      const costPrice = sanitizePrice(formData.costPrice);
       const initialStock = Number(formData.stock);
       const minimumStock = Number(formData.minStock);
 
@@ -273,15 +273,13 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   )}
 
                   <div className="sm:col-span-1">
-                    <label className="block text-sm font-semibold text-gray-900 mb-1.5">Cost Price ({currency})</label>
+                    <label className="block text-sm font-semibold text-gray-900 mb-1.5">Cost Price</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500 sm:text-sm">{currency}</span>
+                        <span className="text-gray-500 sm:text-sm">₹</span>
                       </div>
                       <input 
-                        type="number" 
-                        step="0.01" 
-                        min="0" 
+                        type="text" 
                         value={formData.costPrice} 
                         onChange={e => setFormData({...formData, costPrice: e.target.value})} 
                         className="w-full border border-gray-200 rounded-lg py-2.5 pl-7 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all bg-gray-50" 
@@ -303,15 +301,13 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   </div>
 
                   <div className="sm:col-span-1">
-                    <label className="block text-sm font-semibold text-gray-900 mb-1.5">Selling Price ({currency})</label>
+                    <label className="block text-sm font-semibold text-gray-900 mb-1.5">Selling Price</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500 sm:text-sm">{currency}</span>
+                        <span className="text-gray-500 sm:text-sm">₹</span>
                       </div>
                       <input 
-                        type="number" 
-                        step="0.01" 
-                        min="0" 
+                        type="text" 
                         required 
                         value={formData.price} 
                         onChange={e => setFormData({...formData, price: e.target.value})} 

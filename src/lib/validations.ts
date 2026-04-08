@@ -13,30 +13,23 @@ export function validatePhone(phone: string): boolean {
   return /^[0-9]{10}$/.test(phone);
 }
 
-/**
- * Formats a number into a consistent currency string based on store settings.
- * Ensures 2 decimal places and proper locale-specific separators.
- * @param amount The numeric amount to format.
- * @param currencyCode The currency symbol/code (e.g., 'INR', 'USD', '₹').
- */
 export function formatCurrency(amount: number, currencySymbol: string = '₹'): string {
-  // Map common symbols to ISO codes for Intl.NumberFormat if possible, 
-  // though we'll primarily use the symbol as a prefix for simplicity if not a standard code.
-  const locale = currencySymbol === '₹' ? 'en-IN' : 'en-US';
-  const currency = currencySymbol === '₹' ? 'INR' : currencySymbol === '$' ? 'USD' : 'USD';
-
-  try {
-    return new Intl.NumberFormat(locale, {
+  // If the currency is INR/₹, use standard Indian formatting
+  if (currencySymbol === '₹' || currencySymbol === 'INR') {
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      currency: 'INR',
+      maximumFractionDigits: 0,
     }).format(amount);
-  } catch {
-    // Fallback for non-standard symbols
-    return `${currencySymbol}${amount.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
   }
+
+  // Otherwise, use the provided symbol and standard number formatting
+  return `${currencySymbol}${amount.toLocaleString('en-IN', {
+    maximumFractionDigits: 0,
+  })}`;
 }
+
+
+export const sanitizePrice = (price: string | number): number => {
+  return Number(String(price).replace(/[^\d.]/g, ""));
+};

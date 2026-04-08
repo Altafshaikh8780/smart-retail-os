@@ -4,13 +4,15 @@ import {
   PieChart, Pie, Cell, Legend, AreaChart, Area
 } from "recharts";
 
+import { formatCurrency } from "../lib/validations";
+
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
 
 /**
  * RevenueChart — Weekly bar chart.
  * Wrapped in an explicit-height div so ResponsiveContainer never receives -1 dimensions.
  */
-export const RevenueChart: React.FC<{ data: any[], currency?: string }> = ({ data, currency = "$" }) => {
+export const RevenueChart: React.FC<{ data: any[] }> = ({ data }) => {
   return (
     <div style={{ width: "100%", height: 300 }}>
       <ResponsiveContainer width="100%" height={300}>
@@ -26,11 +28,11 @@ export const RevenueChart: React.FC<{ data: any[], currency?: string }> = ({ dat
             axisLine={false}
             tickLine={false}
             tick={{ fill: "#6b7280", fontSize: 12 }}
-            tickFormatter={(value) => `${currency}${value >= 1000 ? (value/1000).toFixed(1) + 'k' : value}`}
+            tickFormatter={(value) => formatCurrency(value)}
           />
           <RechartsTooltip
             cursor={{ fill: "#f3f4f6" }}
-            formatter={(value: any) => [`${currency}${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "Revenue"]}
+            formatter={(value: any) => [formatCurrency(Number(value || 0)), "Revenue"]}
             contentStyle={{
               borderRadius: "12px",
               border: "none",
@@ -44,7 +46,7 @@ export const RevenueChart: React.FC<{ data: any[], currency?: string }> = ({ dat
   );
 };
 
-export const CategoryChart: React.FC<{ data: any[], currency?: string }> = ({ data, currency = "$" }) => {
+export const CategoryChart: React.FC<{ data: any[] }> = ({ data }) => {
   if (!data || data.length === 0) {
     return (
       <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">
@@ -71,7 +73,7 @@ export const CategoryChart: React.FC<{ data: any[], currency?: string }> = ({ da
             ))}
           </Pie>
           <RechartsTooltip
-            formatter={(value: any) => [`${currency}${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "Sales"]}
+            formatter={(value: any) => [formatCurrency(Number(value || 0)), "Sales"]}
             contentStyle={{
               borderRadius: "12px",
               border: "none",
@@ -90,7 +92,7 @@ export const CategoryChart: React.FC<{ data: any[], currency?: string }> = ({ da
   );
 };
 
-export const SalesTrendChart: React.FC<{ data: any[], currency?: string }> = ({ data, currency = "$" }) => {
+export const SalesTrendChart: React.FC<{ data: any[] }> = ({ data }) => {
   if (!data || data.length === 0) {
     return <div className="h-[300px] flex items-center justify-center text-gray-400">No sales data available.</div>;
   }
@@ -111,10 +113,10 @@ export const SalesTrendChart: React.FC<{ data: any[], currency?: string }> = ({ 
             axisLine={false} 
             tickLine={false} 
             tick={{ fontSize: 10, fill: "#9ca3af" }}
-            tickFormatter={(value) => `${currency}${value}`}
+            tickFormatter={(value) => formatCurrency(value)}
           />
           <RechartsTooltip
-            formatter={(value: any) => [`${currency}${Number(value || 0).toLocaleString()}`, "Sales"]}
+            formatter={(value: any) => [formatCurrency(Number(value || 0)), "Sales"]}
             contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)" }}
           />
           <Area type="monotone" dataKey="sales" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
@@ -124,7 +126,7 @@ export const SalesTrendChart: React.FC<{ data: any[], currency?: string }> = ({ 
   );
 };
 
-export const TopProductsChart: React.FC<{ data: any[], currency?: string }> = ({ data, currency = "$" }) => {
+export const TopProductsChart: React.FC<{ data: any[] }> = ({ data }) => {
   if (!data || data.length === 0) {
     return <div className="h-[300px] flex items-center justify-center text-gray-400">No product analytics available.</div>;
   }
@@ -138,7 +140,7 @@ export const TopProductsChart: React.FC<{ data: any[], currency?: string }> = ({
           <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10, fill: "#4b5563" }} axisLine={false} tickLine={false} />
           <RechartsTooltip 
             cursor={{ fill: '#f9fafb' }}
-            formatter={(value: any) => [`${currency}${Number(value || 0).toLocaleString()}`, "Revenue"]}
+            formatter={(value: any) => [formatCurrency(Number(value || 0)), "Revenue"]}
             contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)" }}
           />
           <Bar dataKey="revenue" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} />

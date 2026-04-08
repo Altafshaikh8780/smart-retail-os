@@ -8,7 +8,6 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../lib/auth';
 import { logActivity } from '../lib/activityLogger';
 import { validatePhone, formatCurrency } from '../lib/validations';
-import { useSettingsStore } from '../store/settingsStore';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -18,8 +17,6 @@ interface CartDrawerProps {
 export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const { items, updateQuantity, removeItem, clearCart, getSubtotal } = useCartStore();
   const { user } = useAuth();
-  const { settings } = useSettingsStore();
-  const currency = settings.currency || "$";
   
   const [checkoutPhase, setCheckoutPhase] = useState<'cart' | 'checkout'>('cart');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -152,6 +149,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         name: item.name,
         quantity: item.quantity,
         unitPrice: item.price,
+        category: item.category || "General",
         discount: 0,
         total: item.quantity * item.price,
         costPrice: item.costPrice || 0,
@@ -316,7 +314,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[100]"
             onClick={handleClose}
           />
 
@@ -326,7 +324,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-white shadow-2xl z-50 flex flex-col"
+            className="fixed inset-y-0 right-0 w-full md:w-[480px] bg-white shadow-2xl z-[101] flex flex-col"
           >
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
@@ -384,7 +382,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                             <div className="flex justify-between items-start">
                               <div>
                                 <h4 className="font-semibold text-gray-900 leading-tight">{item.name}</h4>
-                                <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(item.price, currency)}</p>
+                                <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(item.price)}</p>
                               </div>
                               <button 
                                 onClick={() => removeItem(item.productId)}
@@ -413,7 +411,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                                 </button>
                               </div>
                               <span className="text-sm font-bold text-primary">
-                                {formatCurrency(item.price * item.quantity, currency)}
+                                {formatCurrency(item.price * item.quantity)}
                               </span>
                             </div>
                             
@@ -574,7 +572,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between text-gray-600 items-center">
                     <span>Subtotal</span>
-                    <span className="font-semibold">{formatCurrency(getSubtotal(), currency)}</span>
+                    <span className="font-semibold">{formatCurrency(getSubtotal())}</span>
                   </div>
                   <div className="flex justify-between text-gray-600 items-center">
                     <div className="flex items-center gap-2">
@@ -594,18 +592,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                         <option value="0.28">28%</option>
                       </select>
                     </div>
-                    <span className="font-semibold">{formatCurrency(getSubtotal() * taxRate, currency)}</span>
+                    <span className="font-semibold">{formatCurrency(getSubtotal() * taxRate)}</span>
                   </div>
                   {(formData.customerTier !== 'Standard') && (
                     <div className="flex justify-between text-green-600 font-bold items-center">
                       <span>Tier Discount ({formData.customerTier === 'VIP' ? '2%' : '5%'})</span>
-                      <span>-{formatCurrency(((getSubtotal() * (1 + taxRate)) * (formData.customerTier === 'VIP' ? 0.02 : 0.05)), currency)}</span>
+                      <span>-{formatCurrency(((getSubtotal() * (1 + taxRate)) * (formData.customerTier === 'VIP' ? 0.02 : 0.05)))}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t border-gray-200">
                     <span>Total</span>
                     <span className="text-primary">
-                      {formatCurrency(((getSubtotal() * (1 + taxRate)) * (1 - (formData.customerTier === 'VIP' ? 0.02 : formData.customerTier === 'Wholesale' ? 0.05 : 0))), currency)}
+                      {formatCurrency(((getSubtotal() * (1 + taxRate)) * (1 - (formData.customerTier === 'VIP' ? 0.02 : formData.customerTier === 'Wholesale' ? 0.05 : 0))))}
                     </span>
                   </div>
                 </div>
@@ -635,7 +633,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                       {isSubmitting ? (
                         <><Loader2 className="w-5 h-5 animate-spin mr-2" /> Processing...</>
                       ) : (
-                        `Pay ${formatCurrency(((getSubtotal() * (1 + taxRate)) * (1 - (formData.customerTier === 'VIP' ? 0.02 : formData.customerTier === 'Wholesale' ? 0.05 : 0))), currency)}`
+                        `Pay ${formatCurrency(((getSubtotal() * (1 + taxRate)) * (1 - (formData.customerTier === 'VIP' ? 0.02 : formData.customerTier === 'Wholesale' ? 0.05 : 0))))}`
                       )}
                     </button>
                   </div>

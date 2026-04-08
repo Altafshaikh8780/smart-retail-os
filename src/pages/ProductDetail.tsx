@@ -56,7 +56,7 @@ export const ProductDetail: React.FC = () => {
 // Removed auditLogs state
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editFormData, setEditFormData] = useState({ price: 0, stock: 0, description: "", supplierName: "", minStock: 0 });
+  const [editFormData, setEditFormData] = useState({ name: "", price: 0, stock: 0, description: "", supplierName: "", minStock: 0 });
 
   // AI Restock state
   const [aiResult, setAiResult] = useState<AIRestockResult | null>(null);
@@ -75,6 +75,7 @@ export const ProductDetail: React.FC = () => {
         setProduct(data);
         if (data.images?.length > 0 && !mainImage) setMainImage(data.images[0]);
         setEditFormData({
+          name: data.name || "",
           price: data.price || 0,
           stock: data.stock || 0,
           description: data.description || "",
@@ -108,6 +109,7 @@ export const ProductDetail: React.FC = () => {
     try {
       const pRef = doc(db, "products", id);
       await updateDoc(pRef, {
+        name: editFormData.name,
         price: Number(editFormData.price),
         stock: Number(editFormData.stock),
         minStock: Number(editFormData.minStock),
@@ -122,7 +124,7 @@ export const ProductDetail: React.FC = () => {
         await updateDoc(doc(db, "inventory", invSnap.docs[0].id), {
           stock: Number(editFormData.stock),
           minStock: Number(editFormData.minStock),
-          name: product.name,
+          name: editFormData.name,
           sellingPrice: Number(editFormData.price),
           lastUpdated: serverTimestamp()
         });
@@ -132,8 +134,8 @@ export const ProductDetail: React.FC = () => {
         actorId: user?.uid || "Admin",
         actorName: user?.email || "Admin User",
         targetId: id,
-        targetName: product.name,
-        meta: { price: editFormData.price, stock: editFormData.stock },
+        targetName: editFormData.name,
+        meta: { name: editFormData.name, price: editFormData.price, stock: editFormData.stock },
       });
       toast.success("Product updated successfully!");
       setIsEditing(false);
@@ -704,6 +706,12 @@ export const ProductDetail: React.FC = () => {
                 </button>
               </div>
               <form onSubmit={handleUpdateProduct} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Product Name</label>
+                  <input type="text" required value={editFormData.name}
+                    onChange={e => setEditFormData({...editFormData, name: e.target.value})}
+                    className="w-full border border-slate-200 rounded-lg py-2 px-3 focus:ring-primary focus:border-primary" />
+                </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Selling Price ({currency})</label>
                   <input type="number" step="0.01" required value={editFormData.price}

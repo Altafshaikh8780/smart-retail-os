@@ -8,14 +8,12 @@ import {
 import { Card, CardContent, CardTitle } from "../components/ui/Card";
 import { StatCard } from "../components/ui/StatCard";
 import { useAuth } from "../lib/auth";
-import { useSettingsStore } from "../store/settingsStore";
+import { formatCurrency } from "../lib/validations";
 import { SalesTrendChart, TopProductsChart } from "../components/DashboardCharts";
 
 export const Analytics: React.FC = () => {
   const { role } = useAuth();
-  const { settings } = useSettingsStore();
   const isAdmin = role === "Admin";
-  const currency = settings.currency || "₹";
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
@@ -133,12 +131,12 @@ export const Analytics: React.FC = () => {
 
       {/* KPI Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Revenue (30D)" value={`${currency}${metrics.totalRev.toLocaleString()}`} icon={<DollarSign className="w-6 h-6" />} colorClass="text-blue-600 bg-blue-50" />
+        <StatCard title="Revenue (30D)" value={formatCurrency(metrics.totalRev)} icon={<DollarSign className="w-6 h-6" />} colorClass="text-blue-600 bg-blue-50" />
         {isAdmin && (
-          <StatCard title="Gross Profit" value={`${currency}${metrics.totalProfit.toLocaleString()}`} icon={<TrendingUp className="w-6 h-6" />} colorClass="text-emerald-600 bg-emerald-50" />
+          <StatCard title="Gross Profit" value={formatCurrency(metrics.totalProfit)} icon={<TrendingUp className="w-6 h-6" />} colorClass="text-emerald-600 bg-emerald-50" />
         )}
         <StatCard title="Order Volume" value={metrics.totalOrders.toString()} icon={<ShoppingBag className="w-6 h-6" />} colorClass="text-purple-600 bg-purple-50" />
-        <StatCard title="Avg. Ticket" value={`${currency}${metrics.avgOrderValue.toFixed(0)}`} icon={<BarChart3 className="w-6 h-6" />} colorClass="text-orange-600 bg-orange-50" />
+        <StatCard title="Avg. Ticket" value={formatCurrency(metrics.avgOrderValue)} icon={<BarChart3 className="w-6 h-6" />} colorClass="text-orange-600 bg-orange-50" />
       </div>
 
       {/* Charts Grid */}
@@ -183,7 +181,7 @@ export const Analytics: React.FC = () => {
                    <DollarSign className="w-4 h-4" />
                    <span className="text-xs font-bold uppercase tracking-wider">Revenue</span>
                 </div>
-                <p className="text-2xl font-black text-gray-900">{currency}{metrics.shRevenue.toLocaleString()}</p>
+                <p className="text-2xl font-black text-gray-900">{formatCurrency(metrics.shRevenue)}</p>
                 <p className="text-[10px] text-gray-500 mt-1">Total SH sales turnover</p>
               </div>
               {isAdmin && (
@@ -192,7 +190,7 @@ export const Analytics: React.FC = () => {
                     <TrendingUp className="w-4 h-4" />
                     <span className="text-xs font-bold uppercase tracking-wider">SH Profit</span>
                   </div>
-                  <p className="text-2xl font-black text-emerald-700">{currency}{metrics.shProfit.toLocaleString()}</p>
+                  <p className="text-2xl font-black text-emerald-700">{formatCurrency(metrics.shProfit)}</p>
                   <p className="text-[10px] text-emerald-600 font-medium mt-1">Margin: {metrics.shRevenue > 0 ? ((metrics.shProfit/metrics.shRevenue)*100).toFixed(1) : 0}%</p>
                 </div>
               )}
