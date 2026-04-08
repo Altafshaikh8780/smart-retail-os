@@ -5,7 +5,6 @@ import toast from "react-hot-toast";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { uploadMultipleImages } from "../lib/cloudinary";
-import { useSettingsStore } from "../store/settingsStore";
 import { sanitizePrice } from "../lib/validations";
 
 const CATEGORIES = ["Phones", "Laptops", "Tablets", "Accessories", "Small Electronics", "Second-hand"];
@@ -24,7 +23,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { settings } = useSettingsStore();
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {

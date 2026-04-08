@@ -1,18 +1,18 @@
-import React, { useState, useEffect, useMemo, Suspense, lazy } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   DollarSign, Package, Users, TrendingUp, 
-  ArrowUpRight, ArrowDownRight, MoreVertical,
+  ArrowUpRight, ArrowDownRight,
   ShoppingBag, PackagePlus
 } from "lucide-react";
 import { 
-  collection, query, getDocs, limit, orderBy, where, onSnapshot
+  collection, query, getDocs, orderBy, where, onSnapshot
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { formatCurrency } from "../lib/validations";
 import { motion } from "framer-motion";
-import { useAuth } from "../lib/auth";
-import toast from "react-hot-toast";
+
+
 import { Skeleton } from "../components/Skeleton";
 import { RestockModal } from "../components/RestockModal";
 
@@ -31,13 +31,9 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
 };
 
-const chartVariants = {
-  hidden: { opacity: 0, scale: 0.95 },
-  show: { opacity: 1, scale: 1, transition: { duration: 0.5 } }
-};
+
 
 export const Dashboard: React.FC = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   // Metrics Data
@@ -46,15 +42,14 @@ export const Dashboard: React.FC = () => {
   const [salesByCategoryData, setSalesByCategoryData] = useState<any[]>([]);
   const [recentOrdersList, setRecentOrdersList] = useState<any[]>([]);
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
-  const [topProducts, setTopProducts] = useState<any[]>([]);
-  const [secondHandStats, setSecondHandStats] = useState({ revenue: 0, units: 0, sales: 0 });
+
 
   // State Management
   const [products, setProducts] = useState<any[]>([]);
   const [todayOrders, setTodayOrders] = useState<any[]>([]);
   const [weekOrders, setWeekOrders] = useState<any[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
-  const [loadingAlerts, setLoadingAlerts] = useState(true);
+
   const [restockItem, setRestockItem] = useState<any>(null);
 
   useEffect(() => {
@@ -128,7 +123,6 @@ export const Dashboard: React.FC = () => {
           alerts.sort((a, b) => a.stock - b.stock);
           if (isMounted) {
             setLowStockItems(alerts.slice(0, 5));
-            setLoadingAlerts(false);
           }
         });
         unsubs.push(unsubInv);
@@ -137,7 +131,6 @@ export const Dashboard: React.FC = () => {
         console.error("Failed to load dashboard data", err);
         if (isMounted) {
           setLoadingStats(false);
-          setLoadingAlerts(false);
         }
       }
     };
@@ -237,19 +230,12 @@ export const Dashboard: React.FC = () => {
       { title: "Active Customers", value: uniqueCustomers.size.toLocaleString() || "0", trend: "7-Day", isPositive: true, icon: Users },
     ]);
 
-    setSecondHandStats({ revenue: shRev, units: shUnits, sales: shSales });
     setWeeklyRevenueData(last7Days.map(d => ({ name: d.name, revenue: d.revenue })));
 
     const pieData = Object.keys(categoryMap)
       .map(k => ({ name: k, value: categoryMap[k] }))
       .filter(x => x.value > 0);
     setSalesByCategoryData(pieData.length > 0 ? pieData : [{ name: "No Sales", value: 1 }]);
-
-    const top = Object.entries(productMap)
-      .map(([name, v]) => ({ name, revenue: v.revenue, units: v.units }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5);
-    setTopProducts(top);
 
   }, [todayOrders, weekOrders, products, loadingStats]);
 
