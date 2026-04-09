@@ -105,13 +105,13 @@ export const Customers: React.FC = () => {
       const queryStr = debouncedSearch.toLowerCase();
       const phoneStr = customer.phone?.replace(/\D/g, "") || "";
       const qDigits = queryStr.replace(/\D/g, "");
-      
-      const matchesSearch = customer.name?.toLowerCase().includes(queryStr) || 
-              (qDigits.length > 0 && phoneStr.includes(qDigits)) ||
-              customer.email?.toLowerCase().includes(queryStr);
-      
+
+      const matchesSearch = customer.name?.toLowerCase().includes(queryStr) ||
+        (qDigits.length > 0 && phoneStr.includes(qDigits)) ||
+        customer.email?.toLowerCase().includes(queryStr);
+
       const matchesTier = tierFilter === "all" || customer.loyaltyTier === tierFilter;
-      
+
       return matchesSearch && matchesTier;
     });
   }, [debouncedSearch, customers, tierFilter]);
@@ -151,7 +151,7 @@ export const Customers: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
           <p className="text-gray-500 text-sm mt-1">Manage client relationships, track purchases and identify VIPs.</p>
         </motion.div>
-        
+
         <div className="flex items-center gap-3">
           {role === "Admin" && (
             <motion.button
@@ -165,7 +165,7 @@ export const Customers: React.FC = () => {
               <span>⬇</span> Export CSV
             </motion.button>
           )}
-          <motion.button 
+          <motion.button
             onClick={openAddModal}
             initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
             whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
@@ -188,15 +188,14 @@ export const Customers: React.FC = () => {
             className="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
           />
         </div>
-        
+
         <div className="flex items-center gap-2 flex-wrap">
           {(["all", "Regular", "VIP", "Wholesale"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTierFilter(t)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
-                tierFilter === t ? "bg-primary text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${tierFilter === t ? "bg-primary text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
             >
               {t === "all" ? "All Tiers" : t}
             </button>
@@ -225,28 +224,28 @@ export const Customers: React.FC = () => {
                 onClick={() => navigate(`/customers/${customer.id}`)}
               >
                 <div className="absolute top-4 right-4 flex gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handleEdit(customer); }} 
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEdit(customer); }}
                     className="p-1.5 bg-white text-gray-500 hover:text-primary rounded-md shadow-sm border border-gray-100 hover:border-primary transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   {role === "Admin" && (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDelete(customer.id, customer.name); }} 
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(customer.id, customer.name); }}
                       className="p-1.5 bg-white text-red-500 hover:text-white hover:bg-red-500 rounded-md shadow-sm border border-red-100 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
-                
+
                 <div className="p-6 flex-1 flex flex-col items-center border-b border-gray-50">
                   <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold shadow-sm mb-4 transition-colors duration-300">
                     {customer.name?.substring(0, 2).toUpperCase() || "??"}
                   </div>
                   <h3 className="font-bold text-gray-900 text-lg text-center">{customer.name}</h3>
-                  
+
                   <div className="flex items-center gap-1.5 text-gray-500 mt-2 text-sm">
                     <Phone className="w-3.5 h-3.5" />
                     {customer.phone || "No phone"}
@@ -258,18 +257,18 @@ export const Customers: React.FC = () => {
                     </div>
                   )}
                   {customer.lastPurchaseDate && (
-                     <p className="text-xs text-gray-400 mt-3">Last seen: {customer.lastPurchaseDate}</p>
+                    <p className="text-xs text-gray-400 mt-3">Last seen: {customer.lastPurchaseDate}</p>
                   )}
                 </div>
-                
+
                 <div className="grid grid-cols-3 divide-x divide-gray-100 bg-gray-50/50 group-hover:bg-primary/5 transition-colors duration-300 border-t border-gray-100">
                   <div className="p-3 flex flex-col items-center justify-center hover:bg-white transition-colors">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1">Spent</span>
                     <span className="font-bold text-gray-900 text-sm">
-                      ${(customer.totalSpent || 0).toLocaleString()}
+                      ₹{(customer.totalSpent || 0).toLocaleString()}
                     </span>
                   </div>
-                  
+
                   <div className="p-3 flex flex-col items-center justify-center hover:bg-white transition-colors">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1">Orders</span>
                     <span className="font-bold text-gray-900 text-sm">{customer.totalPurchases || 0}</span>
@@ -277,14 +276,13 @@ export const Customers: React.FC = () => {
 
                   <div className="p-3 flex flex-col items-center justify-center hover:bg-white transition-colors">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1">Tier</span>
-                    <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded-full border ${
-                      customer.loyaltyTier === "VIP" 
-                        ? "bg-yellow-50 text-yellow-700 border-yellow-200" 
+                    <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded-full border ${customer.loyaltyTier === "VIP"
+                        ? "bg-yellow-50 text-yellow-700 border-yellow-200"
                         : customer.loyaltyTier === "Wholesale"
-                        ? "bg-purple-50 text-purple-700 border-purple-200"
-                        : "bg-gray-50 text-gray-500 border-gray-200"
-                    }`}>
-                       {customer.loyaltyTier || "REG"}
+                          ? "bg-purple-50 text-purple-700 border-purple-200"
+                          : "bg-gray-50 text-gray-500 border-gray-200"
+                      }`}>
+                      {customer.loyaltyTier || "REG"}
                     </span>
                   </div>
                 </div>
@@ -293,15 +291,15 @@ export const Customers: React.FC = () => {
           </AnimatePresence>
         </motion.div>
       )}
-      
+
       {!loading && filteredCustomers.length === 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-16 flex flex-col items-center justify-center text-center bg-card rounded-lg border border-gray-100 border-dashed">
           <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-             {searchQuery ? <Search className="w-8 h-8 text-gray-300" /> : <UserPlus className="w-8 h-8 text-gray-300" />}
+            {searchQuery ? <Search className="w-8 h-8 text-gray-300" /> : <UserPlus className="w-8 h-8 text-gray-300" />}
           </div>
           <h3 className="text-lg font-semibold text-gray-900">{searchQuery ? "No matches found" : "No customers yet"}</h3>
           <p className="text-gray-500 max-w-sm mt-1">
-             {searchQuery ? `We couldn't find any customers matching "${searchQuery}".` : "Add your first customer to start tracking history."}
+            {searchQuery ? `We couldn't find any customers matching "${searchQuery}".` : "Add your first customer to start tracking history."}
           </p>
         </motion.div>
       )}
@@ -319,10 +317,10 @@ export const Customers: React.FC = () => {
         </div>
       )}
 
-      <AddCustomerModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        customer={editingCustomer} 
+      <AddCustomerModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        customer={editingCustomer}
       />
     </div>
   );
