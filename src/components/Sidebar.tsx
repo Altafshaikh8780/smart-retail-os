@@ -18,7 +18,8 @@ import {
   BarChart3, 
   BrainCircuit, 
   Settings,
-  RotateCcw
+  RotateCcw,
+  X
 } from "lucide-react";
 
 type NavItem = {
@@ -63,7 +64,12 @@ const navSections: NavSection[] = [
   }
 ];
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
   const { role } = useAuth();
   const permissions = usePermissions();
@@ -82,7 +88,15 @@ export const Sidebar: React.FC = () => {
     .filter((section) => section.items.length > 0);
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar text-slate-300 flex flex-col pt-6 z-20">
+    <aside className={`fixed left-0 top-0 h-screen w-64 bg-sidebar text-slate-300 flex flex-col pt-6 z-[60] transition-transform duration-300 lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      
+      {/* Mobile Close Button */}
+      <button 
+        onClick={onClose}
+        className="absolute top-5 right-4 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 lg:hidden transition-colors"
+      >
+        <X className="w-5 h-5" />
+      </button>
       <div className="px-6 mb-8 mt-4">
         <h1 className="text-xl font-bold text-white tracking-wide truncate" title={settings.storeName}>
           {settings.storeName || "Smart Retail OS"}

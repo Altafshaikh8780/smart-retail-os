@@ -3,7 +3,7 @@ import { collection, query, getDocs, orderBy, where, Timestamp } from "firebase/
 import { db } from "../lib/firebase";
 import { 
   DollarSign, ShoppingBag, Users, TrendingUp, Filter, 
-  Loader2, RefreshCw, Star, BarChart3, PieChart as PieChartIcon
+  Loader2, RefreshCw, BarChart3, PieChart as PieChartIcon
 } from "lucide-react";
 import { Card, CardContent, CardTitle } from "../components/ui/Card";
 import { StatCard } from "../components/ui/StatCard";
@@ -220,9 +220,7 @@ export const Analytics: React.FC = () => {
                    <div className="h-full bg-orange-400 w-[84%] rounded-full" />
                 </div>
               </div>
-              <button className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-primary bg-primary/5 hover:bg-primary/10 rounded-xl transition-colors">
-                <Star className="w-3 h-3" /> Target VIP List
-              </button>
+
             </div>
           </CardContent>
         </Card>

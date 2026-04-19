@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { UserPlus, Mail, Shield, User, TrendingUp, MoreVertical, Loader2, Users } from "lucide-react";
+import { UserPlus, Mail, Shield, User, MoreVertical, Loader2, Users } from "lucide-react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../lib/auth";
@@ -199,26 +199,7 @@ export const Employees: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Sales Performance Bar */}
-                  {employee.role?.includes("Sales") && (
-                    <div>
-                      <div className="flex items-center justify-between text-xs mb-1.5">
-                        <span className="text-gray-500 font-medium flex items-center gap-1">
-                          <TrendingUp className="w-3.5 h-3.5" /> Performance (YTD)
-                        </span>
-                        <span className={`font-bold ${employee.targetHit ? "text-green-600" : "text-gray-700"}`}>
-                          {employee.salesPerformance || 0}%
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-1
-                            ${(employee.salesPerformance || 0) >= 100 ? 'bg-primary' : (employee.salesPerformance || 0) >= 70 ? 'bg-blue-400' : 'bg-gray-400'}`}
-                          style={{ width: `${Math.min(employee.salesPerformance || 0, 100)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  )}
+
 
                   <div className="space-y-2 mt-2 pt-3 border-t border-gray-100">
                      <div className="flex items-center justify-between text-xs">

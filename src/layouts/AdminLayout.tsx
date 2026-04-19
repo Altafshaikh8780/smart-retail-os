@@ -13,10 +13,16 @@ export const AdminLayout: React.FC = () => {
   const location = useLocation();
   const { isOnline } = useNetworkStatus();
   const fetchSettings = useSettingsStore(state => state.fetchSettings);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   React.useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
+
+  // Close sidebar on route change (mobile)
+  React.useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="bg-background min-h-screen flex flex-col">
@@ -26,11 +32,25 @@ export const AdminLayout: React.FC = () => {
            You are working offline. Changes will sync when reconnected.
         </div>
       )}
-      <div className="flex-1 flex w-full">
-        <Sidebar />
-        <div className="flex-1 ml-64 flex flex-col min-h-full">
-        <TopNavbar />
-        <main className="flex-1 p-8 overflow-x-hidden">
+      <div className="flex-1 flex w-full relative">
+        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+        
+        {/* Mobile Sidebar Overlay */}
+        <AnimatePresence>
+          {isSidebarOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSidebarOpen(false)}
+              className="fixed inset-0 bg-black/50 z-[15] lg:hidden backdrop-blur-sm"
+            />
+          )}
+        </AnimatePresence>
+
+        <div className="flex-1 lg:ml-64 flex flex-col min-h-full w-full transition-all duration-300">
+        <TopNavbar onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}

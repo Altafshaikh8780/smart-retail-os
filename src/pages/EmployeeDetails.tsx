@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { motion } from "framer-motion";
 import { ArrowLeft, Mail, Shield, ShieldAlert, Key, Zap, Loader2, User } from "lucide-react";
 import toast from "react-hot-toast";
 import CryptoJS from "crypto-js";
 import { useAuth } from "../lib/auth";
+import { formatCurrency } from "../lib/validations";
+import { useSettingsStore } from "../store/settingsStore";
 
 const SECRET_KEY = import.meta.env.VITE_ENCRYPTION_SECRET || "default_dev_secret_key_123";
 
@@ -14,6 +16,7 @@ export const EmployeeDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { role: currentAdminRole } = useAuth();
+  const { settings } = useSettingsStore();
   
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -36,6 +39,22 @@ export const EmployeeDetails: React.FC = () => {
           const data = docSnap.data();
           setEmployee(data);
           setForm({ role: data.role, status: data.status });
+
+          // Fetch metrics if authUid exists
+          if (data.authUid) {
+            const ordersRef = collection(db, "orders");
+            const q = query(ordersRef, where("cashierId", "==", data.authUid));
+            const oSnap = await getDocs(q);
+            let totalRev = 0;
+            oSnap.forEach(oDoc => {
+              totalRev += (oDoc.data().total || 0);
+            });
+            setEmployee((prev: any) => ({
+              ...prev,
+              ordersHandled: oSnap.size,
+              revenueGenerated: totalRev
+            }));
+          }
         } else {
           toast.error("Employee not found");
           navigate("/employees");
@@ -234,7 +253,7 @@ export const EmployeeDetails: React.FC = () => {
             <div className="bg-gray-50 border border-gray-100 p-6 rounded-2xl flex justify-between items-center hover:bg-green-50/30 transition-colors">
                <div>
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Revenue Generated</p>
-                  <p className="text-3xl font-black text-gray-900">${(employee.revenueGenerated || 0).toLocaleString()}</p>
+                  <p className="text-3xl font-black text-gray-900">{formatCurrency(employee.revenueGenerated || 0, settings.currency || '₹')}</p>
                </div>
                <div className="w-14 h-14 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center shadow-inner">
                   <span className="text-2xl font-black">$</span>

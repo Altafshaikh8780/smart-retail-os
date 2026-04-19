@@ -222,9 +222,50 @@ export const Dashboard: React.FC = () => {
 
     const totalStock = products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
 
+    const startOfToday = new Date();
+    startOfToday.setHours(0,0,0,0);
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
+    let todaysRevenueValue = 0;
+    let yesterdaysRevenueValue = 0;
+    let todaysProfitValue = 0;
+    let yesterdaysProfitValue = 0;
+
+    weekOrders.forEach(order => {
+      const orderTotal = Number(order.total) || 0;
+      const createdAt = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.date);
+      
+      let orderProfit = 0;
+      if (Array.isArray(order.lineItems)) {
+        order.lineItems.forEach((item: any) => {
+          const unitPrice = Number(item.unitPrice) || 0;
+          const costPrice = Number(item.costPrice) || 0;
+          const qty = Number(item.quantity) || 1;
+          orderProfit += (unitPrice - costPrice) * qty;
+        });
+      }
+
+      if (createdAt >= startOfToday) {
+        todaysRevenueValue += orderTotal;
+        todaysProfitValue += orderProfit;
+      } else if (createdAt >= startOfYesterday && createdAt < startOfToday) {
+        yesterdaysRevenueValue += orderTotal;
+        yesterdaysProfitValue += orderProfit;
+      }
+    });
+
+    const revTrendValue = yesterdaysRevenueValue > 0 
+      ? ((todaysRevenueValue - yesterdaysRevenueValue) / yesterdaysRevenueValue * 100).toFixed(1)
+      : (todaysRevenueValue > 0 ? "100" : "0.0");
+    
+    const profitTrendValue = yesterdaysProfitValue > 0
+      ? ((todaysProfitValue - yesterdaysProfitValue) / yesterdaysProfitValue * 100).toFixed(1)
+      : (todaysProfitValue > 0 ? "100" : "0.0");
+
     setStatsData([
-      { title: "Today's Revenue", value: formatCurrency(todaysRevenue), trend: "+0.0%", isPositive: true, icon: DollarSign },
-      { title: "Today's Profit",  value: formatCurrency(todaysProfit), trend: todaysProfit >= 0 ? "+" : "-", isPositive: todaysProfit >= 0, icon: TrendingUp },
+      { title: "Today's Revenue", value: formatCurrency(todaysRevenue), trend: `${Number(revTrendValue) >= 0 ? "+" : ""}${revTrendValue}%`, isPositive: Number(revTrendValue) >= 0, icon: DollarSign },
+      { title: "Today's Profit",  value: formatCurrency(todaysProfit), trend: `${Number(profitTrendValue) >= 0 ? "+" : ""}${profitTrendValue}%`, isPositive: Number(profitTrendValue) >= 0, icon: TrendingUp },
       { title: "Second-hand (7d)", value: formatCurrency(shRev), trend: `${shUnits} units`, isPositive: true, icon: ShoppingBag },
       { title: "Products in Stock",value: totalStock.toLocaleString(), trend: "Live", isPositive: true, icon: Package },
       { title: "Active Customers", value: uniqueCustomers.size.toLocaleString() || "0", trend: "7-Day", isPositive: true, icon: Users },

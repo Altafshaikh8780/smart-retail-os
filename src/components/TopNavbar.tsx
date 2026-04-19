@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Bell, LogOut, Package, User, Check, Loader2, AlertTriangle, ShoppingBag, ArrowRight, ShoppingCart } from "lucide-react";
+import { Menu, Search, Bell, LogOut, Package, User, Check, Loader2, AlertTriangle, ShoppingBag, ArrowRight, ShoppingCart } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth, logout } from "../lib/auth";
 import { useCartStore } from "../store/cartStore";
@@ -24,11 +24,15 @@ type AppNotification = {
   createdAt: any;
 };
 
-export const TopNavbar: React.FC = () => {
+interface TopNavbarProps {
+  onToggleSidebar: () => void;
+}
+
+export const TopNavbar: React.FC<TopNavbarProps> = ({ onToggleSidebar }) => {
   const { user, role } = useAuth();
   const navigate = useNavigate();
 
-  // Cart State
+  // ... (rest of the component state)
   const [isCartOpen, setIsCartOpen] = useState(false);
   const totalItems = useCartStore((state) => state.getTotalItems());
 
@@ -179,8 +183,18 @@ export const TopNavbar: React.FC = () => {
       default: return <Bell className="w-4 h-4 text-gray-500" />;
     }
   };
+
   return (
-    <header className="h-16 bg-white shadow-soft flex items-center justify-between px-8 sticky top-0 z-[50]">
+    <header className="h-16 bg-white shadow-soft flex items-center justify-between px-4 sm:px-8 sticky top-0 z-[50]">
+      <div className="flex items-center gap-4 lg:hidden">
+        <button 
+          onClick={onToggleSidebar}
+          className="p-2 text-gray-500 hover:text-primary transition-colors"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+      </div>
+
       <div className="flex-1 max-w-xl">
         <div ref={searchRef} className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />
